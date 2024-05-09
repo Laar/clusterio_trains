@@ -1,0 +1,36 @@
+{
+	"name": "clusterio_trains",
+	"version": "0.1.0",
+	"description": "Teleporting trains for clusterio",
+	"main": "dist/node/index.js",
+	"scripts": {
+		"prepare": "tsc --build && webpack-cli --env production",
+		"build": "tsc --build",
+		"watch": "tsc --build --watch"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"peerDependencies": {
+		"@clusterio/lib": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "^5.1.6",
+		"@types/node": "^20.4.5",
+		"webpack": "^5.88.2",
+		"webpack-cli": "^5.1.4",
+		"webpack-merge": "^5.9.0",
+		"@clusterio/web_ui": "workspace:*",
+		"@clusterio/lib": "workspace:*"
+	},
+	"dependencies": {
+		"@sinclair/typebox": "^0.30.4"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"keywords": [
+		"clusterio",
+		"factorio"
+	]
+}

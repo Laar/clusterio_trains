@@ -1,0 +1,12 @@
+{
+	"name": "clusterio_trains",
+	"load": [
+		"control.lua"
+	],
+	"require": [
+		"globals.lua"
+	],
+	"dependencies": {
+		"clusterio": "*"
+	}
+}
