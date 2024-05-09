@@ -3,9 +3,10 @@
 	"references": [
 		{ "path": "../../packages/lib/tsconfig.node.json" },
 	],
-	"include": ["./**/*.ts"],
+	"include": ["src/**/*.ts"],
 	"exclude": ["test/*", "./dist/*"],
 	"compilerOptions": {
 		"outDir": "dist/node",
+		"rootDir": "src"
 	},
 }

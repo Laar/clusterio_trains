@@ -16,7 +16,7 @@ module.exports = (env = {}) => merge(common(env), {
 			name: "clusterio_trains",
 			library: { type: "window", name: "plugin_clusterio_trains" },
 			exposes: {
-				"./": "./index.ts",
+				"./": "./src/index.ts",
 				"./package.json": "./package.json",
 			},
 			shared: {
