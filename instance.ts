@@ -12,6 +12,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.instance.handle(PluginExampleEvent, this.handlePluginExampleEvent.bind(this));
 		this.instance.handle(PluginExampleRequest, this.handlePluginExampleRequest.bind(this));
 		this.instance.server.handle("clusterio_trains-plugin_example_ipc", this.handlePluginExampleIPC.bind(this));
+		this.logger.info(`instance with zone config ${this.instance.config.get("clusterio_trains.zones")}`);
 	}
 
 	async onInstanceConfigFieldChanged(field: string, curr: unknown, prev: unknown) {

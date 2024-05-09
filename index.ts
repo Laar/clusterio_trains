@@ -14,14 +14,8 @@ lib.definePermission({
 });
 
 declare module "@clusterio/lib" {
-	export interface ControllerConfigFields {
-		"clusterio_trains.myControllerField": string;
-	}
-	export interface HostConfigFields {
-		"clusterio_trains.myHostField": string;
-	}
 	export interface InstanceConfigFields {
-		"clusterio_trains.myInstanceField": string;
+		"clusterio_trains.zones": object;
 	}
 }
 
@@ -32,31 +26,19 @@ export const plugin: lib.PluginDeclaration = {
 
 	controllerEntrypoint: "./dist/node/controller",
 	controllerConfigFields: {
-		"clusterio_trains.myControllerField": {
-			title: "My Controller Field",
-			description: "This should be removed from index.js",
-			type: "string",
-			initialValue: "Remove Me",
-		},
 	},
 
 	hostEntrypoint: "./dist/node/host",
 	hostConfigFields: {
-		"clusterio_trains.myHostField": {
-			title: "My Host Field",
-			description: "This should be removed from index.js",
-			type: "string",
-			initialValue: "Remove Me",
-		},
 	},
 
 	instanceEntrypoint: "./dist/node/instance",
 	instanceConfigFields: {
-		"clusterio_trains.myInstanceField": {
-			title: "My Instance Field",
-			description: "This should be removed from index.js",
-			type: "string",
-			initialValue: "Remove Me",
+		"clusterio_trains.zones" : {
+			title: "Zones",
+			description: "Teleportation zones",
+			type: "object",
+			initialValue: {}
 		},
 	},
 
