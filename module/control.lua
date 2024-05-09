@@ -8,7 +8,6 @@ local MyModule = {
 
 --- global is 'synced' between players, you should use your plugin name to avoid conflicts
 -- setupGlobalData should either be removed or called during clusterio_api.events.on_server_startup
-local globalData = {}
 local function setupGlobalData()
 	if global.clusterio_trains == nil then
 		global.clusterio_trains = {}
@@ -22,7 +21,6 @@ local function setupGlobalData()
 	if not global.clusterio_trains.debug_draw then
 		global.clusterio_trains.debug_draw = false
 	end
-	globalData = global.clusterio_trains
 end
 
 --- Debug
@@ -37,16 +35,13 @@ local function debug_draw()
 		end
 	end
 
-	if not globalData.debug_draw
+	if not global.clusterio_trains.debug_draw
 	then
 		return
 	end
-	game.print("Drawing")
 	-- Actual drawing
 	local zones = global.clusterio_trains.zones;
 	for zone_name, zone in pairs(zones) do
-		game.print("Test")
-		game.print(zone_name)
         debug_shapes[#debug_shapes + 1] = rendering.draw_rectangle {
             color = {r = 1, g = 0, b = 0},
             width = 2,
@@ -55,16 +50,15 @@ local function debug_draw()
             right_bottom = {x = zone.x2, y = zone.y2},
             surface = zone.surface,
         }
-        -- if zone.link then
-        --     debug_shapes[#debug_shapes + 1] = rendering.draw_text {
-        --         text = {'', zone.link.instance, ':', zone.link.target},
-        --         surface = zone.surface,
-        --         target = {x = zone.x1, y = zone.y1},
-        --         color = {r=1, g=0, b=0},
-        --     }
-        -- end
+        if zone.link then
+            debug_shapes[#debug_shapes + 1] = rendering.draw_text {
+                text = {'', zone.link.instance, ':', zone.link.target},
+                surface = zone.surface,
+                target = {x = zone.x1, y = zone.y1},
+                color = {r=1, g=0, b=0},
+            }
+        end
     end
-	game.print("Drawing end")
 end
 
 --- Public methods should be available though your top level module table
@@ -131,9 +125,8 @@ function MyModule.zone_status(name, enabled)
 end
 
 function MyModule.toggle_debug()
-	globalData.debug_draw = not globalData.debug_draw;
-	local draw = globalData.debug_draw;
-	if (draw)
+	global.clusterio_trains.debug_draw = not global.clusterio_trains.debug_draw;
+	if (global.clusterio_trains.debug_draw)
 	then
 		game.print("Debug draw enabled");
 	else
