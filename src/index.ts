@@ -1,5 +1,6 @@
 import * as lib from "@clusterio/lib";
 import * as Messages from "./messages";
+import { ZoneConfig } from "./instance";
 
 lib.definePermission({
 	name: "clusterio_trains.example.permission.event",
@@ -15,7 +16,7 @@ lib.definePermission({
 
 declare module "@clusterio/lib" {
 	export interface InstanceConfigFields {
-		"clusterio_trains.zones": object;
+		"clusterio_trains.zones": ZoneConfig;
 	}
 }
 
