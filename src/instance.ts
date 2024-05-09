@@ -24,6 +24,8 @@ export type ZoneTarget = {
 	name: string
 }
 
+class InputValidationError extends Error {};
+
 type ZoneAddIPC = {
 	name: string,
 	surface: string,
@@ -53,10 +55,14 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.instance.handle(PluginExampleEvent, this.handlePluginExampleEvent.bind(this));
 		this.instance.handle(PluginExampleRequest, this.handlePluginExampleRequest.bind(this));
 
-		this.instance.server.handle("clusterio_trains_zone_add", this.handleZoneAddIPC.bind(this));
-		this.instance.server.handle("clusterio_trains_zone_delete", this.handleZoneDeleteIPC.bind(this));
-		this.instance.server.handle("clusterio_trains_zone_link", this.handleZoneLinkIPC.bind(this));
-		this.instance.server.handle("clusterio_trains_zone_status", this.handleZoneStatusIPC.bind(this));
+		this.instance.server.handle("clusterio_trains_zone_add", 
+			this.wrapEventFeedback(this.handleZoneAddIPC.bind(this)));
+		this.instance.server.handle("clusterio_trains_zone_delete", 
+			this.wrapEventFeedback(this.handleZoneDeleteIPC.bind(this)));
+		this.instance.server.handle("clusterio_trains_zone_link", 
+			this.wrapEventFeedback(this.handleZoneLinkIPC.bind(this)));
+		this.instance.server.handle("clusterio_trains_zone_status", 
+			this.wrapEventFeedback(this.handleZoneStatusIPC.bind(this)));
 	}
 
 	async onInstanceConfigFieldChanged(field: string, curr: unknown, prev: unknown) {
@@ -91,21 +97,38 @@ export class InstancePlugin extends BaseInstancePlugin {
 		};
 	}
 
+	wrapEventFeedback<T>(handler: (event: T) => Promise<void>) : ((event: T) => Promise<void>) {
+		return async (event) => {
+			try {
+				await handler(event)
+			} catch (err: unknown) {
+				if (err instanceof InputValidationError) {
+					this.logger.info(`Command failed with error ${err.message}`);
+					this.sendRcon(`/c game.print("${err.message}")`);
+				} else {
+					throw err;
+				}
+			}
+		};
+	}
+
 	async handleZoneAddIPC(event: ZoneAddIPC) {
 		this.logger.info(`Received zone add ${JSON.stringify(event)}`);
 		// Check validity
-		if (event.x1 > event.x2 || event.y1 > event.y2 || event.name.length === 0)
-			return;
+		if (event.x1 > event.x2 || event.y1 > event.y2)
+			throw new InputValidationError('Ordering of x or y coordinates incorrect');
+		if (event.name.trim().length == 0)
+			throw new InputValidationError('Empty name');
 		this.logger.info(JSON.stringify(event));
 		const zones = this.instance.config.get("clusterio_trains.zones");
 		for(const key in zones) {
 			if (key == event.name)
 				// Duplicate name
-				return;
+				throw new InputValidationError('Duplicate zone name');
 			let zone = zones[key];
-			if (!(zone.x1 > event.x2 || zone.x2 < event.x1 || zone.y1 > event.y1 || zone.y2 < event.y2))
-				// Overlap
-				return;
+			let overlap = !(zone.x1 > event.x2 || zone.x2 < event.x1) && !(zone.y1 > event.y1 || zone.y2 < event.y2);
+			if(overlap)
+				throw new InputValidationError(`New zone overlaps with ${zone.name}`);
 		}
 		let newZones = {...zones};
 		let newZone = {...event,
@@ -128,8 +151,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 			this.logger.info(`Deleting zone ${event.name}`);
 			await this.syncZone(event.name);
 		} else {
-			this.logger.info(`Unknown zone ${event.name}`);
-			return;
+			throw new InputValidationError(`Unknown zone ${event.name}`);
 		}
 	}
 
@@ -142,7 +164,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 			this.logger.info(`Setting zone ${event.name} status ${event.enabled}`);
 			await this.syncZone(event.name);
 		} else {
-			this.logger.info(`Unknown zone ${event.name}`);
+			throw new InputValidationError(`Unknown zone ${event.name}`);
 		}
 	}
 
@@ -156,7 +178,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 			this.logger.info(`Linking zone ${event.name} to ${event.instance}:${event.target_name}`);
 			await this.syncZone(event.name);
 		} else {
-			this.logger.info(`Unknown zone ${event.name}`);
+			throw new InputValidationError(`Unknown zone ${event.name}`);
 		}
 	}
 
