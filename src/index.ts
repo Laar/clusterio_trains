@@ -39,7 +39,8 @@ export const plugin: lib.PluginDeclaration = {
 			title: "Zones",
 			description: "Teleportation zones",
 			type: "object",
-			initialValue: {}
+			initialValue: {},
+			access: ["host", "instance"]
 		},
 	},
 
