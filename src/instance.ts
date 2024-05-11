@@ -67,13 +67,15 @@ export class InstancePlugin extends BaseInstancePlugin {
 
 	async onInstanceConfigFieldChanged(field: string, curr: unknown, prev: unknown) {
 		this.logger.info(`instance::onInstanceConfigFieldChanged ${field}`);
+		this.logger.info(`old ${JSON.stringify(prev)}`);
+		this.logger.info(`new ${JSON.stringify(curr)}`);
 	}
 
 	async onStart() {
 		let zones = this.instance.config.get("clusterio_trains.zones");
 		let data = JSON.stringify(zones);
 		this.logger.info(`Uploading zone data ${data}`);
-		this.sendRcon(`/c clusterio_trains.sync_zones("${lib.escapeString(data)}")`);
+		this.sendRcon(`/c clusterio_trains.zones.sync_all("${lib.escapeString(data)}")`);
 	}
 
 	async onStop() {
@@ -188,10 +190,10 @@ export class InstancePlugin extends BaseInstancePlugin {
 		if (name in zones) {
 			// Update
 			let data = lib.escapeString(JSON.stringify(zones[name]));
-			this.sendRcon(`/c clusterio_trains.sync_zone("${name}", "${data}")`);
+			this.sendRcon(`/c clusterio_trains.zones.sync("${name}", "${data}")`);
 		} else {
 			// Delete
-			this.sendRcon(`/c clusterio_trains.sync_zone("${name}")`);
+			this.sendRcon(`/c clusterio_trains.zones.sync("${name}")`);
 		}
 	}
 }
