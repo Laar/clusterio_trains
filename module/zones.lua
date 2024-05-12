@@ -141,4 +141,8 @@ function zones_api.find_zone(surface, position)
 	return nil
 end
 
+function zones_api.lookup_zone(name)
+	return global.clusterio_trains.zones[name]
+end
+
 return zones_api;

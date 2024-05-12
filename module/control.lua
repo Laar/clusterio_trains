@@ -1,11 +1,35 @@
 local clusterio_api = require("modules/clusterio/api")
 local zones_api = require("modules/clusterio_trains/zones")
 local stations_api = require("modules/clusterio_trains/stations")
+local trains_api = require("modules/clusterio_trains/trains")
 
 local clusterio_trains = {
-	events = stations_api.events,
+	events = {},
 	on_nth_tick = {},
 }
+
+local merge_events = function (apis)
+	local event_keys = {}
+	for _, api in ipairs(apis) do
+		if (api.events) then
+			for key, handler in pairs(api.events) do
+				if (event_keys[key] == nil) then event_keys[key] = {} end
+				table.insert(event_keys[key], handler)
+			end
+		end
+	end
+
+	local events = {}
+	for key, handlers in pairs(event_keys) do
+		if (#handlers == 1) then
+			events[key] = handlers[1]
+		else
+			error('Not implemented')
+		end
+	end
+	return events
+end
+clusterio_trains.events = merge_events({stations_api, trains_api})
 
 clusterio_trains.zones = {
 	sync_all = zones_api.sync_all,

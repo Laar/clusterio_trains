@@ -32,6 +32,12 @@ function stations_api.init()
     rebuild_station_mapping()
 end
 
+-- Interface --
+---------------
+function stations_api.lookup_station_zone(entity)
+    return global.clusterio_trains.stations[entity.unit_number]
+end
+
 -- Handlers --
 --------------
 local function on_built(entity)
