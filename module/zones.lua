@@ -46,14 +46,18 @@ local function debug_draw()
             right_bottom = {x = zone.x2, y = zone.y2},
             surface = zone.surface,
         }
-        if zone.link then
-            debug_shapes[#debug_shapes + 1] = rendering.draw_text {
-                text = {'', zone.link.instance, ':', zone.link.target},
-                surface = zone.surface,
-                target = {x = zone.x1, y = zone.y1},
-                color = {r=1, g=0, b=0},
-            }
-        end
+		local label = {}
+		if zone.link then
+			label = {'', zone.name, ' -> ', zone.link.instance, ':', zone.link.name}
+		else
+			label = {'', zone.name, ' unlinked'}
+		end
+		debug_shapes[#debug_shapes + 1] = rendering.draw_text {
+			text = label,
+			surface = zone.surface,
+			target = {x = zone.x1, y = zone.y1},
+			color = {r=1, g=0, b=0},
+		}
     end
 end
 
@@ -123,7 +127,8 @@ function zones_api.debug()
 end
 
 
--- Internal interface
+-- Internal interface --
+------------------------
 function zones_api.find_zone(surface, position)
 	local x = position.x
 	local y = position.y
