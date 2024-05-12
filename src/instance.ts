@@ -117,7 +117,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 	async handleZoneAddIPC(event: ZoneAddIPC) {
 		this.logger.info(`Received zone add ${JSON.stringify(event)}`);
 		// Check validity
-		if (event.x1 > event.x2 || event.y1 > event.y2)
+		if (event.x1 >= event.x2 || event.y1 >= event.y2)
 			throw new InputValidationError('Ordering of x or y coordinates incorrect');
 		if (event.name.trim().length == 0)
 			throw new InputValidationError('Empty name');
