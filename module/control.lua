@@ -1,8 +1,9 @@
 local clusterio_api = require("modules/clusterio/api")
 local zones_api = require("modules/clusterio_trains/zones")
+local stations_api = require("modules/clusterio_trains/stations")
 
 local clusterio_trains = {
-	events = {},
+	events = stations_api.events,
 	on_nth_tick = {},
 }
 
@@ -21,6 +22,7 @@ local function setupGlobalData()
 		global.clusterio_trains = {}
 	end
 	zones_api.init()
+	stations_api.init()
 end
 
 --- Clusterio provides a few custom events, on_server_startup is the most useful and should be used in place of on_load

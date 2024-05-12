@@ -2,6 +2,8 @@ local clusterio_api = require("modules/clusterio/api")
 
 local zones_api = {}
 
+-- TODO: Surface rename event?
+
 
 function zones_api.init()
     if not global.clusterio_trains.zones
@@ -120,5 +122,18 @@ function zones_api.debug()
     debug_draw()
 end
 
+
+-- Internal interface
+function zones_api.find_zone(surface, position)
+	local x = position.x
+	local y = position.y
+	for zone_name, zone in pairs(global.clusterio_trains.zones) do
+		if (zone.surface == surface.name and x > zone.x1 and x <= zone.x2 and y > zone.y1 and y <= zone.y2)
+		then
+			return zone_name
+		end
+	end
+	return nil
+end
 
 return zones_api;
