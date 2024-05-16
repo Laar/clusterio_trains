@@ -201,6 +201,7 @@ local function spawn_train(stop, strain)
     local segment_rails = crail.get_rail_segment_rails(rail_dir)
     -- Actual creation
     local created_entities = {}
+    -- TODO: Take from the trainstop registration
     local surface = game.get_surface('nauvis')
     local rail_index = 1
     local rail_length = 0
@@ -229,13 +230,48 @@ local function spawn_train(stop, strain)
         -- TODO: Handling of not placing trains, merging trains
         if et then
             game.print({'', 'Succesful'})
+            table.insert(created_entities, et)
         else
             game.print({'', 'Unsuccesful'})
         end
     end
+    return created_entities
 end
 
-local function deserialize_train(train, strain)
+local function deserialize_train(train_carriages, strain)
+    -- Inventory, fluids, grid, burner, scheduele
+    for cid, carriage in ipairs(train_carriages) do
+        local sinventory = strain.c[cid]
+        for iidx, sinv in pairs(sinventory) do
+            serialize.deserialize_inventory(carriage.get_inventory(iidx), sinv)
+        end
+
+        -- Fluids
+        local sfluids = strain.f[cid]
+        if sfluids ~= nil then
+            local fluidbox = carriage.fluidbox
+            for sidx, sfluid in pairs(sfluids) do
+                fluidbox[sidx] = {
+                    name = sfluid.name,
+                    amount = sfluid.amount,
+                    temperature = sfluid.temperature
+                }
+            end
+        end
+
+        -- grid
+        local sgrid = strain.g[cid]
+        if sgrid ~= nil then
+            serialize.deserialize_equipment_grid(carriage.grid, sgrid)
+        end
+        -- Burner
+        local sburner = strain.b[cid]
+        if sburner ~= nil then
+            local cburner = carriage.burner
+            cburner.currently_burning = game.item_prototypes[sburner.b]
+            cburner.remaining_burning_fuel = sburner.r
+        end
+    end
 end
 
 -- Events --
@@ -271,8 +307,8 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
         -- Try and spawn
         local target_train_stop = stations_api.find_station_in_zone(target_zone_name)
         if (target_train_stop == nil) then return end
-        local new_train = spawn_train(target_train_stop, serialized)
-        deserialize_train(new_train, serialized)
+        local new_train_carriages = spawn_train(target_train_stop, serialized)
+        deserialize_train(new_train_carriages, serialized)
 
     else
         -- Nothing to do
