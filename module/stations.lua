@@ -16,7 +16,10 @@ local function rebuild_station_mapping()
             local zone_name = zones_api.find_zone(entity.surface, entity.position)
             if zone_name then
                 found_stations = found_stations + 1
-                stations[entity.unit_number] = zone_name
+                stations[entity.unit_number] = {
+                    zone = zone_name,
+                    entity = entity
+                }
             end
         end
     end
@@ -35,7 +38,21 @@ end
 -- Interface --
 ---------------
 function stations_api.lookup_station_zone(entity)
-    return global.clusterio_trains.stations[entity.unit_number]
+    local registration = global.clusterio_trains.stations[entity.unit_number]
+    if registration then
+        return registration.zone
+    else
+        return nil
+    end
+end
+
+function stations_api.find_station_in_zone(zone_name)
+    for _, registration in pairs(global.clusterio_trains.stations) do
+        if (registration.zone == zone_name) then
+            return registration.entity
+        end
+    end
+    return nil
 end
 
 -- Handlers --
@@ -44,7 +61,10 @@ local function on_built(entity)
     local zone_name = zones_api.find_zone(entity.surface, entity.position)
     if zone_name
     then
-        global.clusterio_trains.stations[entity.unit_number] = zone_name
+        global.clusterio_trains.stations[entity.unit_number] = {
+            zone = zone_name,
+            entity = entity
+        }
         game.print({'', 'Trainstop built inside zone ', zone_name})
     else
         game.print({'', 'Trainstop built outside zone'})
