@@ -74,6 +74,43 @@ local function is_train_stopped_forwards(train)
     return true -- Guess the most likely option
 end
 
+local function serialize_schedule(schedule)
+    local srecords = {}
+    local c = schedule.current
+    for rid, record in ipairs(schedule.records) do
+        if record.station and not record.temporary then
+            table.insert(srecords, {
+                s = record.station,
+                w = record.wait_conditions
+            })
+        elseif rid < c then
+            c = c - 1
+        end
+    end
+    -- Case: Only temporary stops
+    if #srecords == 0 then return nil end
+    -- Advance to the next stop
+    c = c % #srecords +1
+    return {
+        c = c,
+        r = srecords
+    }
+end
+
+local function deserizalize_schedule(sschedule)
+    if sschedule == nil then return end
+    local records = {}
+    for rid, srecord in ipairs(sschedule.r) do
+        records[rid] = {
+            station = srecord.s,
+            wait_conditions = srecord.w
+        }
+    end
+    return {
+        current = sschedule.c,
+        records = records
+    }
+end
 
 local function serialize_train(train)
     local forwards = is_train_stopped_forwards(train)
@@ -99,7 +136,8 @@ local function serialize_train(train)
         f = {}, -- Fluids
         g = {}, -- Grid
         b = {}, -- Burner
-        s = {} -- Scheduele
+         -- schedule, assumed to be present
+        s = serialize_schedule(train.schedule)
     }
 
     local cid = 0
@@ -138,11 +176,12 @@ local function serialize_train(train)
                 b = cburner.currently_burning.name
             }
         end
-        -- Scheduele
+        -- schedule
         -- TODO!
     end
     return strain
 end
+
 
 local function distance(p1, p2)
     local dx = p1.x - p2.x
@@ -229,17 +268,17 @@ local function spawn_train(stop, strain)
         }
         -- TODO: Handling of not placing trains, merging trains
         if et then
-            game.print({'', 'Succesful'})
             table.insert(created_entities, et)
         else
-            game.print({'', 'Unsuccesful'})
+            game.print({'', 'Unsuccesful spawn ', idx})
+            return nil
         end
     end
     return created_entities
 end
 
 local function deserialize_train(train_carriages, strain)
-    -- Inventory, fluids, grid, burner, scheduele
+    -- Inventory, fluids, grid, burner, schedule
     for cid, carriage in ipairs(train_carriages) do
         local sinventory = strain.c[cid]
         for iidx, sinv in pairs(sinventory) do
@@ -272,6 +311,14 @@ local function deserialize_train(train_carriages, strain)
             cburner.remaining_burning_fuel = sburner.r
         end
     end
+    train_carriages[1].train.schedule = deserizalize_schedule(strain.s)
+end
+
+local function destroy_train(train)
+    for _, carriage in ipairs(train.carriages) do
+        -- TODO: raise_destroy?
+        carriage.destroy{}
+    end
 end
 
 -- Events --
@@ -284,17 +331,17 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
     local new_state = entity.state
     local station = entity.station
     if station == nil then
-        game.print({'', 'Not at a station'})
+        -- game.print({'', 'Not at a station'})
     elseif new_state == defines.train_state.wait_station then
         -- Waiting at a station
         local zone_name = stations_api.lookup_station_zone(station)
         if zone_name == nil then
-            game.print({'', 'Not stopped in a zone'})
-             return
+            -- game.print({'', 'Not stopped in a zone'})
+            return
         end
         local zone = zones_api.lookup_zone(zone_name)
         if zone == nil or zone.link == nil or not zone.enabled then
-            game.print({'', 'Unlinked, disabled or invalid zone'})
+            -- game.print({'', 'Unlinked, disabled or invalid zone'})
             return
         end
 
@@ -302,13 +349,20 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
             zone.link.instance, ':', zone.link.name })
         local serialized = serialize_train(entity)
         local target_zone_name = zone.link.name
-        game.print({'', game.table_to_json(serialize_train(entity))})
+        -- game.print({'', game.table_to_json(serialize_train(entity))})
 
         -- Try and spawn
         local target_train_stop = stations_api.find_station_in_zone(target_zone_name)
         if (target_train_stop == nil) then return end
         local new_train_carriages = spawn_train(target_train_stop, serialized)
-        deserialize_train(new_train_carriages, serialized)
+        if new_train_carriages ~= nil then
+            deserialize_train(new_train_carriages, serialized)
+            train = new_train_carriages[1].train
+            if train.schedule then
+                train.go_to_station(train.schedule.current)
+            end
+            destroy_train(entity)
+        end
 
     else
         -- Nothing to do
