@@ -135,6 +135,8 @@ local function serialize_train(train)
         c = {}, -- Inventory
         f = {}, -- Fluids
         g = {}, -- Grid
+        h = {}, -- health
+        co = {}, -- Colors
         b = {}, -- Burner
          -- schedule, assumed to be present
         s = serialize_schedule(train.schedule)
@@ -176,8 +178,13 @@ local function serialize_train(train)
                 b = cburner.currently_burning.name
             }
         end
-        -- schedule
-        -- TODO!
+        if carriage.health ~= carriage.prototype.max_health then
+            strain.h[cid] = carriage.health
+        end
+        if carriage.color ~= nil and carriage.color ~= carriage.prototype.color then
+            local co = carriage.color
+            strain.co[cid] = {co.r, co.g, co.b, co.a}
+        end
     end
     return strain
 end
@@ -309,6 +316,12 @@ local function deserialize_train(train_carriages, strain)
             local cburner = carriage.burner
             cburner.currently_burning = game.item_prototypes[sburner.b]
             cburner.remaining_burning_fuel = sburner.r
+        end
+        if strain.h[cid] ~= nil then
+            carriage.health = strain.h[cid]
+        end
+        if strain.co[cid] ~= nil then
+            carriage.color = strain.co[cid]
         end
     end
     train_carriages[1].train.schedule = deserizalize_schedule(strain.s)
