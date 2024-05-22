@@ -353,15 +353,17 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
             return
         end
         local zone = zones_api.lookup_zone(zone_name)
-        if zone == nil or zone.link == nil or not zone.enabled then
+        if zone == nil or zone.link == nil then
             -- game.print({'', 'Unlinked, disabled or invalid zone'})
             return
         end
+        local link = zone.link
+        local instanceName = global.clusterio_trains.instances[link.instanceId].name
 
         game.print({'', 'Stopped at a station in zone ', zone_name, ' target teleport ',
-            zone.link.instance, ':', zone.link.name })
+            instanceName, ':', link.zoneName })
         local serialized = serialize_train(entity)
-        local target_zone_name = zone.link.name
+        local target_zone_name = link.zoneName
         -- game.print({'', game.table_to_json(serialize_train(entity))})
 
         -- Try and spawn

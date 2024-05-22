@@ -38,7 +38,6 @@ clusterio_trains.zones = {
 	add = zones_api.add,
 	delete = zones_api.delete,
 	link = zones_api.link,
-	status = zones_api.status,
 	debug = zones_api.debug
 }
 

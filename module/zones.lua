@@ -42,26 +42,28 @@ local function debug_draw()
 	-- Actual drawing
 	local zones = global.clusterio_trains.zones;
 	for zone_name, zone in pairs(zones) do
+		local region = zone.region
         debug_shapes[#debug_shapes + 1] = rendering.draw_rectangle {
             color = {r = 1, g = 0, b = 0},
             width = 2,
             filled = false,
-            left_top = {x = zone.x1, y = zone.y1},
-            right_bottom = {x = zone.x2, y = zone.y2},
-            surface = zone.surface,
+            left_top = {x = region.x1, y = region.y1},
+            right_bottom = {x = region.x2, y = region.y2},
+            surface = region.surface,
         }
 		local label = {}
 		if zone.link then
-			local target_instance = global.clusterio_trains.instances[zone.link.instance]
-			local target = target_instance and target_instance.name or zone.link.instance
-			label = {'', zone.name, ' -> ', target, ':', zone.link.name}
+			local link = zone.link
+			local target_instance = global.clusterio_trains.instances[link.instanceId]
+			local target = target_instance and target_instance.name or zone.link.instanceId
+			label = {'', zone.name, ' -> ', target, ':', link.zoneName}
 		else
 			label = {'', zone.name, ' unlinked'}
 		end
 		debug_shapes[#debug_shapes + 1] = rendering.draw_text {
 			text = label,
-			surface = zone.surface,
-			target = {x = zone.x1, y = zone.y1},
+			surface = region.surface,
+			target = {x = region.x1, y = region.y1},
 			color = {r=1, g=0, b=0},
 		}
     end
@@ -109,40 +111,51 @@ end
 function zones_api.add(name, x1, y1, x2, y2, surface)
     -- local surface = surface or game.player.surface.name or ''
 	local surface = surface or (game.player and game.player.surface.name) or 'nauvis';
-	clusterio_api.send_json("clusterio_trains_zone_add", {
-		name = name,
-		surface = surface,
-		x1 = x1,
-		y1 = y1,
-		x2 = x2,
-		y2 = y2
+	clusterio_api.send_json("clusterio_trains_zone", {
+		t = "Add",
+		z = {
+			name = name,
+			region = {
+				surface = surface,
+				x1 = x1,
+				y1 = y1,
+				x2 = x2,
+				y2 = y2
+			}
+		}
 	});
 end
 
 function zones_api.delete(name)
-    clusterio_api.send_json("clusterio_trains_zone_delete", {
-		name = name
+    clusterio_api.send_json("clusterio_trains_zone", {
+		t = "Delete",
+		z = {
+			name = name
+		}
 	});
 end
 
 function zones_api.link (name, instance_name, target_name)
-	local instance = global.clusterio_trains.instances[instance_name]
-	if instance == nil then
-		game.print({'', 'Unknown instance with name ', instance_name})
-		return
+	if instance_name then
+		local instance = global.clusterio_trains.instances[instance_name]
+		if instance == nil then
+			game.print({'', 'Unknown instance with name ', instance_name})
+			return
+		end
+		clusterio_api.send_json("clusterio_trains_zone", {
+			t = "Update",
+			z = {
+				name = name,
+				link = {
+					instanceId = instance.id,
+					zoneName = target_name
+				}
+			}
+		})
+	else
+		clusterio_api.send_json("clusterio_trains_zone",
+			'{"t":"Update","z":{"name":"' + name + '","link":null}}')
 	end
-    clusterio_api.send_json("clusterio_trains_zone_link", {
-		name = name,
-		instance = instance.id,
-		target_name = target_name
-	});
-end
-
-function zones_api.status(name, enabled)
-    clusterio_api.send_json("clusterio_trains_zone_status", {
-		name = name,
-		enabled = enabled
-	})
 end
 
 function zones_api.debug()
@@ -159,7 +172,10 @@ function zones_api.find_zone(surface, position)
 	local x = position.x
 	local y = position.y
 	for zone_name, zone in pairs(global.clusterio_trains.zones) do
-		if (zone.surface == surface.name and x > zone.x1 and x <= zone.x2 and y > zone.y1 and y <= zone.y2)
+		local region = zone.region
+		if (region.surface == surface.name
+				and x > region.x1 and x <= region.x2 
+				and y > region.y1 and y <= region.y2)
 		then
 			return zone_name
 		end

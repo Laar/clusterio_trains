@@ -7,49 +7,39 @@ export type ZoneConfig = Record<string, ZoneDefinition>;
 
 export type ZoneDefinition = {
 	// Name of the zone
-	name: string,
-	// Linking target
-	link: ZoneTarget | null,
-	// Whether enabled
-	enabled: boolean,
-	// Surface on this host
-	surface: string,
-	x1: number,
-	y1: number,
-	x2 : number
-	y2: number
-};
+	name: string
+	// Linked target
+	link: ZoneTarget | null
+	// Region on the map
+	region: Region
+}
 
 export type ZoneTarget = {
-	instance: number
-	name: string
+	instanceId: number
+	zoneName: string
+}
+
+export type Region = {
+	surface: string
+	x1: number
+	y1: number
+	x2: number
+	y2: number
+}
+
+enum UpdateType {
+	Add = "Add",
+	Update = "Update",
+	Delete = "Delete"
+}
+
+type ZoneUpdateIPC = {
+	z : Partial<ZoneDefinition>,
+	t : UpdateType
 }
 
 class InputValidationError extends Error {};
 
-type ZoneAddIPC = {
-	name: string,
-	surface: string,
-	x1: number,
-	y1: number,
-	x2 : number
-	y2: number
-}
-
-type ZoneDeleteIPC = {
-	name: string
-}
-
-type ZoneLinkIPC = {
-	name: string
-	instance: number
-	target_name: string
-}
-
-type ZoneStatusIPC = {
-	name: string
-	enabled: boolean
-}
 
 export class InstancePlugin extends BaseInstancePlugin {
 	private instanceDB : Map<number, InstanceDetails> = new Map()
@@ -58,14 +48,8 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.instance.handle(PluginExampleEvent, this.handlePluginExampleEvent.bind(this));
 		this.instance.handle(PluginExampleRequest, this.handlePluginExampleRequest.bind(this));
 
-		this.instance.server.handle("clusterio_trains_zone_add", 
-			this.wrapEventFeedback(this.handleZoneAddIPC.bind(this)));
-		this.instance.server.handle("clusterio_trains_zone_delete", 
-			this.wrapEventFeedback(this.handleZoneDeleteIPC.bind(this)));
-		this.instance.server.handle("clusterio_trains_zone_link", 
-			this.wrapEventFeedback(this.handleZoneLinkIPC.bind(this)));
-		this.instance.server.handle("clusterio_trains_zone_status", 
-			this.wrapEventFeedback(this.handleZoneStatusIPC.bind(this)));
+		this.instance.server.handle("clusterio_trains_zone",
+			this.wrapEventFeedback(this.handleZoneUpdateIPC.bind(this)))
 		await this.refreshInstances()
 	}
 
@@ -119,85 +103,88 @@ export class InstancePlugin extends BaseInstancePlugin {
 		};
 	}
 
-	async handleZoneAddIPC(event: ZoneAddIPC) {
-		this.logger.info(`Received zone add ${JSON.stringify(event)}`);
-		// Check validity
-		if (event.x1 >= event.x2 || event.y1 >= event.y2)
-			throw new InputValidationError('Ordering of x or y coordinates incorrect');
-		if (event.name.trim().length == 0)
-			throw new InputValidationError('Empty name');
-		this.logger.info(JSON.stringify(event));
-		const zones = this.instance.config.get("clusterio_trains.zones");
-		for(const key in zones) {
-			if (key == event.name)
-				// Duplicate name
-				throw new InputValidationError('Duplicate zone name');
-			let zone = zones[key];
-			let overlap = !(zone.x1 > event.x2 || zone.x2 < event.x1) && !(zone.y1 > event.y1 || zone.y2 < event.y2);
-			if(overlap)
-				throw new InputValidationError(`New zone overlaps with ${zone.name}`);
+	validateZone(zone: Readonly<ZoneDefinition>, zones: Readonly<ZoneConfig>) : void {
+		if(zone.region !== undefined) {
+			const region = zone.region
+			if (region.surface.trim().length == 0)
+				throw new InputValidationError('Empty surface specification')
+			if(region.x1 >= region.x2 || region.y1 >= region.y2) {
+				throw new InputValidationError('Invalid region specification')
+			}
+
+			for(const key in zones) {
+				if (key == zone.name)
+					continue
+				let otherZone = zones[key]
+				if (otherZone.region === undefined)
+					continue
+				let otherRegion = otherZone.region
+				if (otherRegion.surface !== region.surface)
+					continue
+				let overlap = !(otherRegion.x1 > region.x2 || otherRegion.x2 < region.x1) 
+					&& !(otherRegion.y1 > region.y1 || otherRegion.y2 < region.y2);
+				if (overlap)
+					throw new InputValidationError(`Zone region overlaps with zone ${otherZone.name}`)
+			}
 		}
+		if (zone.link != null)  {
+			const link = zone.link
+			if(!this.instanceDB.has(link.instanceId)) {
+				throw new InputValidationError(`Unknown target instance with id ${link.instanceId}`)
+			}
+		}
+	}
+
+	async handleZoneUpdateIPC(event: ZoneUpdateIPC) {
+		const zones = this.instance.config.get("clusterio_trains.zones");
 		let newZones = {...zones};
-		let newZone = {...event,
-			link: null,
-			enabled: false // Can't enable an unlinked zone
+
+		const zone = event.z
+		if (zone.name === undefined) {
+			throw new InputValidationError(`Update without a zone name`)
 		}
-		newZones[event.name] = newZone;
+		const name = zone.name
+		switch(event.t) {
+			case "Add": {
+				if (zone.region === undefined) {
+					throw new InputValidationError("Zone creation without region")
+				}
+				const region = zone.region
+				let newZone = {name: name, region: region, link: zone.link ?? null}
+				if (name in zones) {
+					throw new InputValidationError(`Zone ${zone.name} already exists`);
+				}
+				this.validateZone(newZone, zones)
+				newZones[name] = newZone
+				this.logger.audit(`Created zone ${zone.name}`)
+				break
+			}
+			case "Update": {
+				if (!(name in zones)) {
+					throw new InputValidationError(`Zone ${zone.name} does not exists`);
+				}
+				let updatedZone = {...zones[name], ...zone}
+				this.validateZone(updatedZone, zones)
+				newZones[name] = updatedZone
+				this.logger.audit(`Updated zone ${zone.name}`)
+				break
+			}
+			case "Delete": {
+				if (!(name in zones)) {
+					throw new InputValidationError(`Zone ${zone.name} does not exists`);
+				}
+				this.logger.audit(`Removing zone ${zone.name}`)
+				delete newZones[zone.name];
+				break
+			}
+		}
 		this.instance.config.set("clusterio_trains.zones", newZones);
-		this.logger.info(`Created zone ${event.name}`);
-		await this.syncZone(event.name);
-		this.logger.info(`Finished creating zone ${event.name}`);
-	}
 
-	async handleZoneDeleteIPC(event: ZoneDeleteIPC) {
-		const zones = this.instance.config.get("clusterio_trains.zones");
-		if (event.name in zones) {
-			let newZones = {...zones};
-			delete newZones[event.name];
-			this.instance.config.set("clusterio_trains.zones", newZones);
-			this.logger.info(`Deleting zone ${event.name}`);
-			await this.syncZone(event.name);
-		} else {
-			throw new InputValidationError(`Unknown zone ${event.name}`);
-		}
-	}
-
-	async handleZoneStatusIPC(event : ZoneStatusIPC) {
-		const zones = this.instance.config.get("clusterio_trains.zones");
-		if(event.name in zones) {
-			let newZones = {...zones};
-			zones[event.name].enabled = event.enabled;
-			this.instance.config.set("clusterio_trains.zones", newZones);
-			this.logger.info(`Setting zone ${event.name} status ${event.enabled}`);
-			await this.syncZone(event.name);
-		} else {
-			throw new InputValidationError(`Unknown zone ${event.name}`);
-		}
-	}
-
-	async handleZoneLinkIPC(event: ZoneLinkIPC) {
-		const zones = this.instance.config.get("clusterio_trains.zones");
-		if(event.name in zones) {
-			let newZones = {...zones};
-			
-			zones[event.name].link = {instance: event.instance, name: event.target_name};
-			this.instance.config.set("clusterio_trains.zones", newZones);
-			this.logger.info(`Linking zone ${event.name} to ${event.instance}:${event.target_name}`);
-			await this.syncZone(event.name);
-		} else {
-			throw new InputValidationError(`Unknown zone ${event.name}`);
-		}
-	}
-
-	async syncZone(name: string) {
-		const zones = this.instance.config.get("clusterio_trains.zones");
-		this.logger.info(`Sending data about zone ${name}`)
-		if (name in zones) {
-			// Update
-			let data = lib.escapeString(JSON.stringify(zones[name]));
+		this.logger.info(`Syncing zone ${name}`)
+		if (event.t !== "Delete") {
+			let data = lib.escapeString(JSON.stringify(newZones[name]));
 			this.sendRcon(`/c clusterio_trains.zones.sync("${name}", "${data}")`);
 		} else {
-			// Delete
 			this.sendRcon(`/c clusterio_trains.zones.sync("${name}")`);
 		}
 	}
