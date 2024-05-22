@@ -1,6 +1,7 @@
 import * as lib from "@clusterio/lib";
 import { BaseInstancePlugin } from "@clusterio/host";
-import { PluginExampleEvent, PluginExampleRequest } from "./messages";
+import { InstanceDetails, InstanceListRequest, PluginExampleEvent, PluginExampleRequest } from "./messages";
+import { Type, Static } from "@sinclair/typebox";
 
 export type ZoneConfig = Record<string, ZoneDefinition>;
 
@@ -20,7 +21,7 @@ export type ZoneDefinition = {
 };
 
 export type ZoneTarget = {
-	instance: string
+	instance: number
 	name: string
 }
 
@@ -41,7 +42,7 @@ type ZoneDeleteIPC = {
 
 type ZoneLinkIPC = {
 	name: string
-	instance: string
+	instance: number
 	target_name: string
 }
 
@@ -51,6 +52,8 @@ type ZoneStatusIPC = {
 }
 
 export class InstancePlugin extends BaseInstancePlugin {
+	private instanceDB : Map<number, InstanceDetails> = new Map()
+
 	async init() {
 		this.instance.handle(PluginExampleEvent, this.handlePluginExampleEvent.bind(this));
 		this.instance.handle(PluginExampleRequest, this.handlePluginExampleRequest.bind(this));
@@ -63,6 +66,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 			this.wrapEventFeedback(this.handleZoneLinkIPC.bind(this)));
 		this.instance.server.handle("clusterio_trains_zone_status", 
 			this.wrapEventFeedback(this.handleZoneStatusIPC.bind(this)));
+		await this.refreshInstances()
 	}
 
 	async onInstanceConfigFieldChanged(field: string, curr: unknown, prev: unknown) {
@@ -76,6 +80,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		let data = JSON.stringify(zones);
 		this.logger.info(`Uploading zone data ${data}`);
 		this.sendRcon(`/c clusterio_trains.zones.sync_all("${lib.escapeString(data)}")`);
+		this.sendInstances();
 	}
 
 	async onStop() {
@@ -195,5 +200,21 @@ export class InstancePlugin extends BaseInstancePlugin {
 			// Delete
 			this.sendRcon(`/c clusterio_trains.zones.sync("${name}")`);
 		}
+	}
+
+	async refreshInstances() {
+		let instances : Array<InstanceDetails>
+			= await this.instance.sendTo("controller", new InstanceListRequest())
+		this.instanceDB.clear()
+		instances.forEach(instance => {
+			this.instanceDB.set(instance.id, {id: instance.id, name: instance.name})
+		})
+		this.logger.info(`Updated instances found ${instances.length}`)
+	}
+
+	async sendInstances() {	 
+		this.logger.info('Overwriting instance list')
+		let data = JSON.stringify(Array.from(this.instanceDB.values()))
+		this.sendRcon(`/c clusterio_trains.zones.set_instances("${lib.escapeString(data)}")`)
 	}
 }

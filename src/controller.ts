@@ -1,7 +1,9 @@
 import * as lib from "@clusterio/lib";
 import { BaseControllerPlugin, InstanceInfo } from "@clusterio/controller";
+import { Static } from "@sinclair/typebox";
 
 import {
+	InstanceListRequest,
 	PluginExampleEvent, PluginExampleRequest,
 } from "./messages";
 
@@ -9,6 +11,7 @@ export class ControllerPlugin extends BaseControllerPlugin {
 	async init() {
 		this.controller.handle(PluginExampleEvent, this.handlePluginExampleEvent.bind(this));
 		this.controller.handle(PluginExampleRequest, this.handlePluginExampleRequest.bind(this));
+		this.controller.handle(InstanceListRequest, this.handleInstanceListRequest.bind(this))
 	}
 
 	async onControllerConfigFieldChanged(field: string, curr: unknown, prev: unknown) {
@@ -41,5 +44,17 @@ export class ControllerPlugin extends BaseControllerPlugin {
 			myResponseString: request.myString,
 			myResponseNumbers: request.myNumberArray,
 		};
+	}
+
+	async handleInstanceListRequest(request: InstanceListRequest) {
+		let result : Array<Static<typeof InstanceListRequest.instanceResponse>> = []
+		this.controller.instances.forEach((info: InstanceInfo, id: number) => {
+			let name: string = info.config.get("instance.name")
+			result.push({
+				id: id,
+				name: name
+			})
+		})
+		return result
 	}
 }

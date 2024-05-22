@@ -18,6 +18,10 @@ function zones_api.init()
     then
         global.clusterio_trains.zone_debug_shapes = {}
     end
+	if not global.clusterio_trains.instances
+	then
+		global.clusterio_trains.instances = {}
+	end
 end
 
 local function debug_draw()
@@ -48,7 +52,9 @@ local function debug_draw()
         }
 		local label = {}
 		if zone.link then
-			label = {'', zone.name, ' -> ', zone.link.instance, ':', zone.link.name}
+			local target_instance = global.clusterio_trains.instances[zone.link.instance]
+			local target = target_instance and target_instance.name or zone.link.instance
+			label = {'', zone.name, ' -> ', target, ':', zone.link.name}
 		else
 			label = {'', zone.name, ' unlinked'}
 		end
@@ -70,6 +76,21 @@ function zones_api.sync_all(zone_data)
 	global.clusterio_trains.zones = zone_table
 	game.print({'', 'Synced ', zone_count, ' zones'})
 	debug_draw();
+end
+
+function zones_api.set_instances(instance_data)
+	local instance_table = game.json_to_table(instance_data)
+	local instances = {}
+	for _, instance in ipairs(instance_table) do
+		local inst = {
+			id = instance.id,
+			name = instance.name
+		}
+		instances[instance.id] = inst
+		instances[instance.name] = inst
+	end
+	global.clusterio_trains.instances = instances
+	debug_draw()
 end
 
 function zones_api.sync(name, zone)
@@ -104,10 +125,15 @@ function zones_api.delete(name)
 	});
 end
 
-function zones_api.link (name, instance, target_name)
+function zones_api.link (name, instance_name, target_name)
+	local instance = global.clusterio_trains.instances[instance_name]
+	if instance == nil then
+		game.print({'', 'Unknown instance with name ', instance_name})
+		return
+	end
     clusterio_api.send_json("clusterio_trains_zone_link", {
 		name = name,
-		instance = instance,
+		instance = instance.id,
 		target_name = target_name
 	});
 end

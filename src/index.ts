@@ -47,6 +47,7 @@ export const plugin: lib.PluginDeclaration = {
 	messages: [
 		Messages.PluginExampleEvent,
 		Messages.PluginExampleRequest,
+		Messages.InstanceListRequest
 	],
 
 	webEntrypoint: "./web",

@@ -1,4 +1,4 @@
-import { plainJson, jsonArray, JsonBoolean, JsonNumber, JsonString, StringEnum } from "@clusterio/lib";
+import { plainJson, jsonArray } from "@clusterio/lib";
 import { Type, Static } from "@sinclair/typebox";
 
 export class PluginExampleEvent {
@@ -52,4 +52,44 @@ export class PluginExampleRequest {
 		"myResponseString": Type.String(),
 		"myResponseNumbers": Type.Array(Type.Number()),
 	}));
+}
+
+export class InstanceDetails {
+	constructor(
+		public readonly id: number,
+		public name: string
+	) {}
+
+	static jsonSchema = Type.Object({
+		"id": Type.Number(),
+		"name": Type.String()
+	})
+
+	static fromJSON(json: Static<typeof InstanceDetails.jsonSchema>) {
+		return new InstanceDetails(
+			json.id, json.name
+		)
+	}
+}
+
+export class InstanceListRequest {
+	declare ["constructor"]: typeof InstanceListRequest
+	static type = "request" as const
+	static src = ["instance"] as const
+	static dst = ["controller"] as const
+	static plugin = "clusterio_trains" as const
+	// static permission = ""
+	constructor() {}
+	static jsonSchema = Type.Object({})
+
+	static fromJSON(json: Static<typeof InstanceListRequest.jsonSchema>) {
+		return new InstanceListRequest()
+	}
+
+	static instanceResponse = Type.Object({
+		"id": Type.Number(),
+		"name": Type.String()
+	})
+
+	static Response = jsonArray(InstanceDetails);
 }

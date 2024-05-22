@@ -34,6 +34,7 @@ clusterio_trains.events = merge_events({stations_api, trains_api})
 clusterio_trains.zones = {
 	sync_all = zones_api.sync_all,
 	sync = zones_api.sync,
+	set_instances = zones_api.set_instances,
 	add = zones_api.add,
 	delete = zones_api.delete,
 	link = zones_api.link,
