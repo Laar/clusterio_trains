@@ -1,6 +1,6 @@
 import * as lib from "@clusterio/lib";
 import { BaseInstancePlugin } from "@clusterio/host";
-import { InstanceDetails, InstanceListRequest, PluginExampleEvent, PluginExampleRequest } from "./messages";
+import { ClearenceResponse, InstanceDetails, InstanceListRequest, PluginExampleEvent, PluginExampleRequest, TrainClearenceRequest, TrainTeleportRequest } from "./messages";
 import { Type, Static } from "@sinclair/typebox";
 
 export type ZoneConfig = Record<string, ZoneDefinition>;
@@ -41,6 +41,19 @@ type ZoneUpdateIPC = {
 class InputValidationError extends Error {};
 
 
+type ClearenceIPC = {
+	length: number
+	id: number
+	instanceId: number
+	targetZone: string
+}
+
+type TeleportIPC = {
+	instanceId: number
+	targetZone: string
+	train: object
+}
+
 export class InstancePlugin extends BaseInstancePlugin {
 	private instanceDB : Map<number, InstanceDetails> = new Map()
 
@@ -50,6 +63,13 @@ export class InstancePlugin extends BaseInstancePlugin {
 
 		this.instance.server.handle("clusterio_trains_zone",
 			this.wrapEventFeedback(this.handleZoneUpdateIPC.bind(this)))
+
+		this.instance.server.handle("clustorio_trains_clearence", this.handleClearenceIPC.bind(this))
+		this.instance.handle(TrainClearenceRequest, this.handleClearenceRequest.bind(this))
+		this.instance.server.handle("clusterio_trains_teleport", this.handleTeleportIPC.bind(this))
+		this.instance.handle(TrainTeleportRequest, this.handleTeleportRequest.bind(this))
+
+
 		await this.refreshInstances()
 	}
 
@@ -63,7 +83,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		let zones = this.instance.config.get("clusterio_trains.zones");
 		let data = JSON.stringify(zones);
 		this.logger.info(`Uploading zone data ${data}`);
-		this.sendRcon(`/c clusterio_trains.zones.sync_all("${lib.escapeString(data)}")`);
+		this.sendRcon(`/sc clusterio_trains.zones.sync_all("${lib.escapeString(data)}")`);
 		this.sendInstances();
 	}
 
@@ -95,7 +115,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 			} catch (err: unknown) {
 				if (err instanceof InputValidationError) {
 					this.logger.info(`Command failed with error ${err.message}`);
-					this.sendRcon(`/c game.print("${err.message}")`);
+					this.sendRcon(`/sc game.print("${err.message}")`);
 				} else {
 					throw err;
 				}
@@ -183,12 +203,13 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.logger.info(`Syncing zone ${name}`)
 		if (event.t !== "Delete") {
 			let data = lib.escapeString(JSON.stringify(newZones[name]));
-			this.sendRcon(`/c clusterio_trains.zones.sync("${name}", "${data}")`);
+			this.sendRcon(`/sc clusterio_trains.zones.sync("${name}", "${data}")`);
 		} else {
-			this.sendRcon(`/c clusterio_trains.zones.sync("${name}")`);
+			this.sendRcon(`/sc clusterio_trains.zones.sync("${name}")`);
 		}
 	}
 
+	// Instance
 	async refreshInstances() {
 		let instances : Array<InstanceDetails>
 			= await this.instance.sendTo("controller", new InstanceListRequest())
@@ -202,6 +223,52 @@ export class InstancePlugin extends BaseInstancePlugin {
 	async sendInstances() {	 
 		this.logger.info('Overwriting instance list')
 		let data = JSON.stringify(Array.from(this.instanceDB.values()))
-		this.sendRcon(`/c clusterio_trains.zones.set_instances("${lib.escapeString(data)}")`)
+		this.sendRcon(`/sc clusterio_trains.zones.set_instances("${lib.escapeString(data)}")`)
+	}
+
+	// Clearence
+	async handleClearenceIPC(event: ClearenceIPC) {
+		if (!this.instanceDB.has(event.instanceId)) {
+			this.logger.error('Invalid target instance id')
+		}
+		// Handle disconnected
+		const request = new TrainClearenceRequest(
+			event.length,
+			event.id,
+			event.targetZone
+		)
+		let response
+		if(event.instanceId == this.instance.id) {
+			response = await this.handleClearenceRequest(request)
+		} else {
+			response = await this.instance.sendTo({"instanceId" : event.instanceId}, request)
+		}
+		const data = JSON.stringify(response)
+		this.sendRcon(`/sc clusterio_trains.trains.on_clearence("${lib.escapeString(data)}")`)
+	}
+
+	async handleClearenceRequest(event: TrainClearenceRequest) : Promise<ClearenceResponse> {
+		return {
+			id: event.id,
+			result: "Ready"
+		}
+	}
+
+	// Teleport
+	async handleTeleportIPC(event: TeleportIPC) {
+		const request = new TrainTeleportRequest(event.targetZone, event.train)
+		this.logger.info(`Teleporting train to instance ${event.instanceId} zone ${request.zone}`)
+		let response
+		if (event.instanceId == this.instance.id) {
+			response = this.handleTeleportRequest(request)
+		} else {
+			response = this.instance.sendTo({"instanceId": event.instanceId}, request)
+		}
+	}
+	async handleTeleportRequest(request: TrainTeleportRequest) {
+		this.logger.info(`Received train for zone ${request.zone}`)
+		let data = JSON.stringify(request)
+		this.sendRcon(`/sc clusterio_trains.trains.on_teleport_receive("${lib.escapeString(data)}")`)
+		return {}
 	}
 }

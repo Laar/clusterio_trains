@@ -74,6 +74,9 @@ function zones_api.sync_all(zone_data)
 	local zone_count = 0
 	for zone_name, zone in pairs(zone_table) do
 		zone_count = zone_count + 1
+		if zone.region == nil then
+			zone_table[zone_name] = nil
+		end
 	end
 	global.clusterio_trains.zones = zone_table
 	game.print({'', 'Synced ', zone_count, ' zones'})
@@ -173,6 +176,7 @@ function zones_api.find_zone(surface, position)
 	local y = position.y
 	for zone_name, zone in pairs(global.clusterio_trains.zones) do
 		local region = zone.region
+		-- Safety against bogus data
 		if (region.surface == surface.name
 				and x > region.x1 and x <= region.x2 
 				and y > region.y1 and y <= region.y2)

@@ -41,12 +41,18 @@ clusterio_trains.zones = {
 	debug = zones_api.debug
 }
 
+clusterio_trains.trains = {
+	on_clearence = trains_api.on_clearence,
+	on_teleport_receive = trains_api.on_teleport_receive
+}
+
 local function setupGlobalData()
 	if global.clusterio_trains == nil then
 		global.clusterio_trains = {}
 	end
 	zones_api.init()
 	stations_api.init()
+	trains_api.init()
 end
 
 --- Clusterio provides a few custom events, on_server_startup is the most useful and should be used in place of on_load

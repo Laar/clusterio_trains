@@ -1,4 +1,4 @@
-import { plainJson, jsonArray } from "@clusterio/lib";
+import { plainJson, jsonArray, jsonPrimitive, StringEnum } from "@clusterio/lib";
 import { Type, Static } from "@sinclair/typebox";
 
 export class PluginExampleEvent {
@@ -92,4 +92,68 @@ export class InstanceListRequest {
 	})
 
 	static Response = jsonArray(InstanceDetails);
+}
+
+let ClearenceResult = StringEnum(["Ready", "Offline"])
+export type ClearenceResult = Static<typeof ClearenceResult>
+
+let ClearenceResponse = Type.Object({
+	"result" : ClearenceResult,
+	"id": Type.Number()
+})
+
+export type ClearenceResponse = Static<typeof ClearenceResponse>
+
+export class TrainClearenceRequest {
+	declare ["constructor"]: typeof TrainClearenceRequest
+	static type = "request" as const
+	static src = ["instance"] as const
+	static dst = ["instance"] as const
+	static plugin = "clusterio_trains" as const
+	// permissions
+
+	constructor(
+		public readonly length: number,
+		public readonly id: number,
+		public readonly zone: string
+	) {}
+
+	static jsonSchema = Type.Object({
+		length: Type.Number(),
+		id: Type.Number(),
+		zone: Type.String()
+	})
+
+	static fromJSON(json: Static<typeof TrainClearenceRequest.jsonSchema>) {
+		return new TrainClearenceRequest(json.length, json.id, json.zone)
+	}
+
+	static Response = plainJson(ClearenceResponse)
+}
+
+export class TrainTeleportRequest {
+	declare ["constructor"]: typeof TrainTeleportRequest
+	static type = "request" as const
+	static src = ["instance"] as const
+	static dst = ["instance"] as const
+	static plugin = "clusterio_trains" as const
+
+	constructor(
+		public readonly zone: string,
+		public readonly train: object
+	) {}
+
+	static jsonSchema = Type.Object({
+		zone: Type.String(),
+		train: Type.Object({})
+	})
+
+	static fromJSON(json: Static<typeof TrainTeleportRequest.jsonSchema>) {
+		return new TrainTeleportRequest(
+			json.zone,
+			json.train
+		)
+	}
+
+	static Response = plainJson(Type.Object({}))
 }

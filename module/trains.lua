@@ -41,6 +41,12 @@ local function effective_rail_direction(rail_direction, entity_direction)
     end
 end
 
+-- Init --
+----------
+trains_api.init = function ()
+    global.clusterio_trains.clearence_queue = {}
+end
+
 -- Helpers --
 -------------
 
@@ -334,6 +340,69 @@ local function destroy_train(train)
     end
 end
 
+-- Teleporting --
+-----------------
+
+local function request_clearence (train, link)
+    if not train.valid then return end
+    game.print({'', 'Requesting clearence for train ', train.id})
+    global.clusterio_trains.clearence_queue[train.id] = {
+        train = train,
+        link = link
+    }
+    clusterio_api.send_json('clustorio_trains_clearence', {
+        length = 1,
+        id = train.id,
+        instanceId = link.instanceId,
+        targetZone = link.zoneName
+    })
+end
+
+trains_api.on_clearence = function (event_data)
+    local event = game.json_to_table(event_data)
+    local trainId = event.id
+    local result = event.result
+    local queue = global.clusterio_trains.clearence_queue[trainId]
+    if not queue then
+        game.print({'', 'Train ', trainId, ' was not queued'})
+        return
+    end
+    if result ~= 'Ready' then
+        game.print({'', 'Train ', trainId, ' got negative clearence request'})
+        -- TODO: Need to somehow rerequest
+        return
+    end
+    local train = queue.train
+    local link = queue.link
+    if not train.valid or train.manual_mode or train.station == nil or not train.station.valid then
+        return
+    end
+    -- Start actual teleport
+    local strain = serialize_train(train)
+    clusterio_api.send_json("clusterio_trains_teleport", {
+        instanceId = link.instanceId,
+        targetZone = link.zoneName,
+        train = strain
+    })
+    destroy_train(train)
+end
+
+trains_api.on_teleport_receive = function (event_data)
+    local event = game.json_to_table(event_data)
+    local zone_name = event.zone
+    local strain = event.train
+    local target_train_stop = stations_api.find_station_in_zone(zone_name)
+    if target_train_stop == nil then return end
+    local new_train_carriages = spawn_train(target_train_stop, strain)
+    if new_train_carriages ~= nil then
+        deserialize_train(new_train_carriages, strain)
+        local train = new_train_carriages[1].train
+        if train.schedule then
+            train.go_to_station(train.schedule.current)
+        end
+    end
+end
+
 -- Events --
 ------------
 
@@ -362,22 +431,29 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
 
         game.print({'', 'Stopped at a station in zone ', zone_name, ' target teleport ',
             instanceName, ':', link.zoneName })
-        local serialized = serialize_train(entity)
-        local target_zone_name = link.zoneName
-        -- game.print({'', game.table_to_json(serialize_train(entity))})
+        request_clearence(entity, link)
+        -- local serialized = serialize_train(entity)
+        -- local target_zone_name = link.zoneName
+        -- clusterio_api.send_json('clustorio_trains_clearence', {
+        --     length = 1,
+        --     id = 1,
+        --     instanceId = link.instanceId,
+        --     targetZone = target_zone_name
+        -- })
+        -- -- game.print({'', game.table_to_json(serialize_train(entity))})
 
-        -- Try and spawn
-        local target_train_stop = stations_api.find_station_in_zone(target_zone_name)
-        if (target_train_stop == nil) then return end
-        local new_train_carriages = spawn_train(target_train_stop, serialized)
-        if new_train_carriages ~= nil then
-            deserialize_train(new_train_carriages, serialized)
-            train = new_train_carriages[1].train
-            if train.schedule then
-                train.go_to_station(train.schedule.current)
-            end
-            destroy_train(entity)
-        end
+        -- -- Try and spawn
+        -- local target_train_stop = stations_api.find_station_in_zone(target_zone_name)
+        -- if (target_train_stop == nil) then return end
+        -- local new_train_carriages = spawn_train(target_train_stop, serialized)
+        -- if new_train_carriages ~= nil then
+        --     deserialize_train(new_train_carriages, serialized)
+        --     train = new_train_carriages[1].train
+        --     if train.schedule then
+        --         train.go_to_station(train.schedule.current)
+        --     end
+        --     destroy_train(entity)
+        -- end
 
     else
         -- Nothing to do
