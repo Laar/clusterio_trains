@@ -3,12 +3,24 @@ local stations_api = require("modules/clusterio_trains/stations")
 local zones_api = require("modules/clusterio_trains/zones")
 local serialize = require("modules/clusterio_trains/train_serialize")
 
+-- CONSTANTS
+
+-- How many ticks between checking for work
+TELEPORT_WORK_INTERVAL = 15
+
+-- How many ticks between two subsequent attempts at teleporting a train
+TELEPORT_COOLDOWN_TICKS = 120
+--
+
+
 local trains_api = {
-    events = {}
+    events = {},
+    on_nth_tick = {}
 }
 
 -- Init --
 ----------
+
 trains_api.init = function ()
     global.clusterio_trains.clearence_queue = {}
 end
@@ -26,13 +38,24 @@ end
 -- Teleporting --
 -----------------
 
+local function train_teleport_valid(train)
+    -- Is this a valid train for teleporting
+    if not train.valid or train.manual_mode or train.station == nil or not train.station.valid
+    then
+        return false
+    end
+    -- TODO: More indepth checks on the station, e.g. whether in a zone
+    return true
+end
+
 local function request_clearence (train, link)
-    if not train.valid then return end
+    -- Request clearence for a LuaTrain, assumes that train_teleport_valid
     game.print({'', 'Requesting clearence for train ', train.id})
     local length = serialize.linear_train_position(train)
     global.clusterio_trains.clearence_queue[train.id] = {
         train = train,
-        link = link
+        link = link,
+        tick = game.tick
     }
     clusterio_api.send_json('clustorio_trains_clearence', {
         length = length,
@@ -40,6 +63,20 @@ local function request_clearence (train, link)
         instanceId = link.instanceId,
         targetZone = link.zoneName
     })
+end
+
+trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
+    for trainId, request in pairs(global.clusterio_trains.clearence_queue) do
+        if game.tick - request.tick >= TELEPORT_COOLDOWN_TICKS then
+            if not train_teleport_valid(request.train) then
+                -- Not valid for teleporting any more
+                global.clusterio_trains.clearence_queue[trainId] = nil
+            else
+                -- Will implicitly update the request
+                request_clearence(request.train, request.link)
+            end
+        end
+    end
 end
 
 trains_api.on_clearence = function (event_data)
@@ -92,11 +129,13 @@ end
 ------------
 
 trains_api.events[defines.events.on_train_changed_state] = function (event)
-    local entity = event.train
-    if not entity.valid then return end
-    local old_state = event.old_state
-    local new_state = entity.state
-    local station = entity.station
+    local train = event.train
+    if not train.valid then return end
+    -- Remove any previous clearence requests, done on any event to prevent
+    -- previous requests from hanging around
+    global.clusterio_trains.clearence_queue[train.id] = nil
+    local new_state = train.state
+    local station = train.station
     if station == nil then
         -- game.print({'', 'Not at a station'})
     elseif new_state == defines.train_state.wait_station then
@@ -116,7 +155,7 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
 
         game.print({'', 'Stopped at a station in zone ', zone_name, ' target teleport ',
             instanceName, ':', link.zoneName })
-        request_clearence(entity, link)
+        request_clearence(train, link)
     else
         -- Nothing to do
         -- game.print({'', 'Wrong state'})

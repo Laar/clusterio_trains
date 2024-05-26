@@ -30,6 +30,7 @@ local merge_events = function (apis)
 	return events
 end
 clusterio_trains.events = merge_events({stations_api, trains_api})
+clusterio_trains.on_nth_tick = trains_api.on_nth_tick
 
 clusterio_trains.zones = {
 	sync_all = zones_api.sync_all,
