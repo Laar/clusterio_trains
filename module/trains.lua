@@ -23,6 +23,7 @@ local trains_api = {
 
 trains_api.init = function ()
     global.clusterio_trains.clearence_queue = {}
+    global.clusterio_trains.spawn_queue = {}
 end
 
 -- Helpers --
@@ -48,6 +49,33 @@ local function train_teleport_valid(train)
     return true
 end
 
+local function create_train(strain, zone_name)
+    -- Tries to create a serialized train in a given zone
+    -- returns a success boolean
+    local target_train_stop = stations_api.find_station_in_zone(zone_name)
+    if target_train_stop == nil
+    then
+        return false
+    end
+    local new_train_carriages = {}
+    return xpcall(function ()
+        serialize.spawn_train(target_train_stop, strain, new_train_carriages)
+        if #new_train_carriages ~= #strain.t then
+            error("Incorrect number of entities")
+        end
+        serialize.deserialize_train(new_train_carriages, strain)
+        local train = new_train_carriages[1].train
+        if train.schedule then
+            train.go_to_station(train.schedule.current)
+        end
+    end, function (error_msg)
+        log(error_msg)
+        for _, e in ipairs(new_train_carriages) do
+            e.destroy()
+        end
+    end)
+end
+
 local function request_clearence (train, link)
     -- Request clearence for a LuaTrain, assumes that train_teleport_valid
     game.print({'', 'Requesting clearence for train ', train.id})
@@ -66,7 +94,7 @@ local function request_clearence (train, link)
 end
 
 trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
-    for trainId, request in pairs(global.clusterio_trains.clearence_queue) do
+    for trainId, request in ipairs(global.clusterio_trains.clearence_queue) do
         if game.tick - request.tick >= TELEPORT_COOLDOWN_TICKS then
             if not train_teleport_valid(request.train) then
                 -- Not valid for teleporting any more
@@ -77,6 +105,27 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
             end
         end
     end
+    local updated_spawn_queue = {}
+    for _, pending in ipairs(global.clusterio_trains.spawn_queue) do
+        local strain = pending.strain
+        local zone_name = pending.zone_name
+        if game.tick - pending.tick > TELEPORT_COOLDOWN_TICKS
+        then
+            if create_train(strain, zone_name)
+            then
+                -- Nothing to do, will remove it from the queue
+            else
+                table.insert(updated_spawn_queue, {
+                    zone_name = zone_name,
+                    strain = strain,
+                    tick = game.tick
+                })
+            end
+        else
+            table.insert(updated_spawn_queue, pending)
+        end
+    end
+    global.clusterio_trains.spawn_queue = updated_spawn_queue
 end
 
 trains_api.on_clearence = function (event_data)
@@ -113,15 +162,12 @@ trains_api.on_teleport_receive = function (event_data)
     local event = game.json_to_table(event_data)
     local zone_name = event.zone
     local strain = event.train
-    local target_train_stop = stations_api.find_station_in_zone(zone_name)
-    if target_train_stop == nil then return end
-    local new_train_carriages = serialize.spawn_train(target_train_stop, strain)
-    if new_train_carriages ~= nil then
-        serialize.deserialize_train(new_train_carriages, strain)
-        local train = new_train_carriages[1].train
-        if train.schedule then
-            train.go_to_station(train.schedule.current)
-        end
+    if not create_train(strain, zone_name) then
+        table.insert(global.clusterio_trains.spawn_queue, {
+            zone_name = zone_name,
+            strain = strain,
+            tick = game.tick
+        })
     end
 end
 

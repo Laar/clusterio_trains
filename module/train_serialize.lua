@@ -234,20 +234,16 @@ local function serialize_train(train)
     return strain
 end
 
-local function spawn_train(stop, strain)
-    -- TODO xpcall
+local function spawn_train(stop, strain, created_entities)
     local total_length, carriage_positions = linear_train_position(strain.t)
     local crail = stop.connected_rail
     local rail_dir = stop.connected_rail_direction
     local segment_length = crail.get_rail_segment_length()
     if segment_length < total_length then
         -- Might want some margin
-        game.print({'', 'Too short segment'})
-        return
+        error('Rail segment (' .. segment_length .. 'too short for train of length ' .. total_length)
     end
     local segment_rails = crail.get_rail_segment_rails(rail_dir)
-    -- Actual creation
-    local created_entities = {}
     -- TODO: Take from the trainstop registration
     local surface = game.get_surface('nauvis')
     local rail_index = 1
@@ -278,11 +274,9 @@ local function spawn_train(stop, strain)
         if et then
             table.insert(created_entities, et)
         else
-            game.print({'', 'Unsuccesful spawn ', idx})
-            return nil
+            error("Could not create carriage " .. idx)
         end
     end
-    return created_entities
 end
 
 local function deserialize_train(train_carriages, strain)
