@@ -2,6 +2,28 @@ local clusterio_api = require("modules/clusterio/api")
 
 local zones_api = {}
 
+--- @alias zone_name string
+---
+--- @class Zone
+--- @field name zone_name
+--- @field region Region
+--- @field link Link?
+---
+--- @class Region
+--- @field surface string
+--- @field x1 number
+--- @field y1 number
+--- @field x2 number
+--- @field y2 number
+---
+--- @class Link
+--- @field instanceId number
+--- @field zoneName zone_name
+---
+--- @class Instance
+--- @field id integer
+--- @field name string
+
 -- TODO: Surface rename event?
 
 
@@ -52,8 +74,8 @@ local function debug_draw()
             surface = region.surface,
         }
 		local label = {}
-		if zone.link then
-			local link = zone.link
+		local link = zone.link
+		if link ~= nil then
 			local target_instance = global.clusterio_trains.instances[link.instanceId]
 			local target = target_instance and target_instance.name or zone.link.instanceId
 			label = {'', zone.name, ' -> ', target, ':', link.zoneName}
@@ -69,7 +91,11 @@ local function debug_draw()
     end
 end
 
+--- Set all zones
+--- @param zone_data string
 function zones_api.sync_all(zone_data)
+	---@type {[zone_name]: Zone}
+	---@diagnostic disable-next-line: assign-type-mismatch
     local zone_table = game.json_to_table(zone_data)
 	local zone_count = 0
 	for zone_name, zone in pairs(zone_table) do
@@ -83,8 +109,13 @@ function zones_api.sync_all(zone_data)
 	debug_draw();
 end
 
+--- Set data of all instances
+--- @param instance_data string
 function zones_api.set_instances(instance_data)
+	---@type {[integer]: Instance}
+	---@diagnostic disable-next-line: assign-type-mismatch
 	local instance_table = game.json_to_table(instance_data)
+	---@type {[integer|string]: Instance}
 	local instances = {}
 	for _, instance in ipairs(instance_table) do
 		local inst = {
@@ -98,12 +129,17 @@ function zones_api.set_instances(instance_data)
 	debug_draw()
 end
 
-function zones_api.sync(name, zone)
-    if (zone)
+---Sync the data for a single zone
+---@param name zone_name
+---@param zone_data string?
+function zones_api.sync(name, zone_data)
+    if (zone_data)
 	then
 		-- Update
-		game.print({'', 'Zone ', name, ' update ', zone})
-		local zone = game.json_to_table(zone);
+		game.print({'', 'Zone ', name, ' update ', zone_data})
+		---@type Zone
+		---@diagnostic disable-next-line: assign-type-mismatch
+		local zone = game.json_to_table(zone_data);
 		global.clusterio_trains.zones[name] = zone
 	else
 		global.clusterio_trains.zones[name] = nil
@@ -171,6 +207,10 @@ end
 
 -- Internal interface --
 ------------------------
+---Find a zone for a given position
+---@param surface LuaSurface
+---@param position {x: number, y:number}
+---@return zone_name?
 function zones_api.find_zone(surface, position)
 	local x = position.x
 	local y = position.y
@@ -178,7 +218,7 @@ function zones_api.find_zone(surface, position)
 		local region = zone.region
 		-- Safety against bogus data
 		if (region.surface == surface.name
-				and x > region.x1 and x <= region.x2 
+				and x > region.x1 and x <= region.x2
 				and y > region.y1 and y <= region.y2)
 		then
 			return zone_name
@@ -187,6 +227,9 @@ function zones_api.find_zone(surface, position)
 	return nil
 end
 
+---Find zone by name
+---@param name zone_name
+---@return Zone?
 function zones_api.lookup_zone(name)
 	return global.clusterio_trains.zones[name]
 end

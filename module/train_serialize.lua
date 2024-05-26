@@ -1,5 +1,24 @@
 local serialize = require("modules/clusterio/serialize")
 
+
+-- Types --
+-----------
+
+---@class LuaEntity_RollingStock: LuaEntity
+-- ---@field train LuaTrain
+
+---@class SerializedTrain
+---@field t [string] Carriage prototype names
+---@field d [boolean] Direction of the carriages with respect to the ordering of t
+---@field c [table] Inventory
+---@field f [table] fluids
+---@field g [table] equipment grid 
+---@field h [number] health
+---@field co [table] colors
+---@field b [table] burner information
+---@field s [table] serialized train schedule
+
+
 -- Helpers --
 -------------
 
@@ -72,6 +91,12 @@ local is_train_stopped_forwards = function(train)
     return true -- Guess the most likely option
 end
 
+---Compute positions of a train
+---@param carriages_or_luatrain [string] | LuaTrain
+---@return number # Length of the train
+---@return [number] # Positions of the carraiges along a straight line, with the
+--- first position such that spawning the carriage on a stright rail would place
+--- it next to a train stop
 local linear_train_position = function (carriages_or_luatrain)
     -- Given a set of train carriages or a LuaTrain compute:
     -- The total length of the train
@@ -157,6 +182,9 @@ end
 -- Trains --
 ------------
 
+---Serialize a train
+---@param train LuaTrain
+---@return SerializedTrain
 local function serialize_train(train)
     local forwards = is_train_stopped_forwards(train)
     -- Iteration direction
@@ -217,26 +245,30 @@ local function serialize_train(train)
         end
         -- Burner
         if carriage.burner and carriage.burner.currently_burning then
-            local cburner = carriage.burner
             strain.b[cid] = {
-                r = cburner.remaining_burning_fuel,
-                b = cburner.currently_burning.name
+                r = carriage.burner.remaining_burning_fuel,
+                b = carriage.burner.currently_burning.name
             }
         end
         if carriage.health ~= carriage.prototype.max_health then
             strain.h[cid] = carriage.health
         end
-        if carriage.color ~= nil and carriage.color ~= carriage.prototype.color then
-            local co = carriage.color
+        local co = carriage.color
+        if co ~= nil and co ~= carriage.prototype.color then
             strain.co[cid] = {co.r, co.g, co.b, co.a}
         end
     end
     return strain
 end
 
+---Spawn train carriages
+---@param stop LuaEntity_TrainStop
+---@param strain SerializedTrain
+---@param created_entities [LuaEntity]
 local function spawn_train(stop, strain, created_entities)
     local total_length, carriage_positions = linear_train_position(strain.t)
     local crail = stop.connected_rail
+    if crail == nil then error("Station without connected rail") end
     local rail_dir = stop.connected_rail_direction
     local segment_length = crail.get_rail_segment_length()
     if segment_length < total_length then
@@ -246,6 +278,7 @@ local function spawn_train(stop, strain, created_entities)
     local segment_rails = crail.get_rail_segment_rails(rail_dir)
     -- TODO: Take from the trainstop registration
     local surface = game.get_surface('nauvis')
+    if surface == nil then error('Invalid surface') end
     local rail_index = 1
     local rail_length = 0
     local rail_distance = 0
@@ -279,6 +312,9 @@ local function spawn_train(stop, strain, created_entities)
     end
 end
 
+---Deserialize train content
+---@param train_carriages [LuaEntity]
+---@param strain SerializedTrain
 local function deserialize_train(train_carriages, strain)
     -- Inventory, fluids, grid, burner, schedule
     for cid, carriage in ipairs(train_carriages) do

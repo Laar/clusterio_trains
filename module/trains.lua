@@ -18,29 +18,36 @@ local trains_api = {
     on_nth_tick = {}
 }
 
+-- Types --
+-----------
+
+---@class ClearenceEntry
+---@field train LuaTrain
+---@field tick integer
+---@field link Link
+
+---@class SpawnEntry
+---@field zone_name zone_name
+---@field strain SerializedTrain
+---@field tick integer
+
 -- Init --
 ----------
 
 trains_api.init = function ()
+    ---@type {[integer]: ClearenceEntry}
     global.clusterio_trains.clearence_queue = {}
+    ---@type [SpawnEntry]
     global.clusterio_trains.spawn_queue = {}
-end
-
--- Helpers --
--------------
-
-local function destroy_train(train)
-    for _, carriage in ipairs(train.carriages) do
-        -- TODO: raise_destroy?
-        carriage.destroy{}
-    end
 end
 
 -- Teleporting --
 -----------------
 
+---Check whether a train is valid for teleporting
+---@param train LuaTrain
+---@return boolean
 local function train_teleport_valid(train)
-    -- Is this a valid train for teleporting
     if not train.valid or train.manual_mode or train.station == nil or not train.station.valid
     then
         return false
@@ -49,6 +56,10 @@ local function train_teleport_valid(train)
     return true
 end
 
+---@param strain SerializedTrain
+---@param zone_name zone_name
+---@return boolean # Whether succesful
+---@nodiscard
 local function create_train(strain, zone_name)
     -- Tries to create a serialized train in a given zone
     -- returns a success boolean
@@ -76,7 +87,9 @@ local function create_train(strain, zone_name)
     end)
 end
 
-local function request_clearence (train, link)
+---@param train LuaTrain
+---@param link Link
+local function request_clearence(train, link)
     -- Request clearence for a LuaTrain, assumes that train_teleport_valid
     game.print({'', 'Requesting clearence for train ', train.id})
     local length = serialize.linear_train_position(train)
@@ -129,6 +142,8 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
 end
 
 trains_api.on_clearence = function (event_data)
+    ---@type {id: number, result: string}
+    ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)
     local trainId = event.id
     local result = event.result
@@ -155,10 +170,14 @@ trains_api.on_clearence = function (event_data)
         train = strain
     })
     global.clusterio_trains.clearence_queue[trainId] = nil
-    destroy_train(train)
+    for _, e in ipairs(train.carriages) do
+        e.destroy()
+    end
 end
 
 trains_api.on_teleport_receive = function (event_data)
+    ---@type {zone: zone_name, train: SerializedTrain}
+    ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)
     local zone_name = event.zone
     local strain = event.train
@@ -174,6 +193,8 @@ end
 -- Events --
 ------------
 
+--- Handle train changing
+---@param event EventData.on_train_changed_state:EventData
 trains_api.events[defines.events.on_train_changed_state] = function (event)
     local train = event.train
     if not train.valid then return end
