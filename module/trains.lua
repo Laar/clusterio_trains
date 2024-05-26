@@ -29,12 +29,13 @@ end
 local function request_clearence (train, link)
     if not train.valid then return end
     game.print({'', 'Requesting clearence for train ', train.id})
+    local length = serialize.linear_train_position(train)
     global.clusterio_trains.clearence_queue[train.id] = {
         train = train,
         link = link
     }
     clusterio_api.send_json('clustorio_trains_clearence', {
-        length = 1,
+        length = length,
         id = train.id,
         instanceId = link.instanceId,
         targetZone = link.zoneName

@@ -83,9 +83,9 @@ local linear_train_position = function (carriages_or_luatrain)
     then
         local next_proto = function (carriages, i)
             i = i + 1
-            local v = carriages[i].name
+            local v = carriages[i]
             if v then 
-                return i, v
+                return i, v.name
             end
         end
         iter = function (lua_train)
@@ -236,7 +236,7 @@ end
 
 local function spawn_train(stop, strain)
     -- TODO xpcall
-    local total_length, carriage_positions = tu.linear_train_position(strain.t)
+    local total_length, carriage_positions = linear_train_position(strain.t)
     local crail = stop.connected_rail
     local rail_dir = stop.connected_rail_direction
     local segment_length = crail.get_rail_segment_length()
