@@ -7,6 +7,44 @@ local stations_api = {
 -- Reload --
 ------------
 
+local function create_registration(station, zone_name)
+    local crail = station.connected_rail
+    local rail_dir = station.connected_rail_direction
+    local length = crail.get_rail_segment_length()
+
+    -- Backside of the station is connected to a longer rail
+    local segment_end, segment_out_dir = crail.get_rail_segment_end(1 - rail_dir)
+    local egress = false
+    for _, connection_dir in ipairs({defines.rail_connection_direction.left,
+        defines.rail_connection_direction.straight,
+        defines.rail_connection_direction.right}) do
+            local next_rail = segment_end.get_connected_rail{rail_direction=segment_out_dir, rail_connection_direction=connection_dir}
+            if next_rail ~= nil then
+                egress = true
+            end
+    end
+    -- front side of the station is connected to a longer rail
+    segment_end, segment_out_dir = crail.get_rail_segment_end(rail_dir)
+    local ingress = false
+    for _, connection_dir in ipairs({defines.rail_connection_direction.left,
+        defines.rail_connection_direction.straight,
+        defines.rail_connection_direction.right}) do
+            local next_rail = segment_end.get_connected_rail{rail_direction=segment_out_dir, rail_connection_direction=connection_dir}
+            if next_rail ~= nil then
+                ingress = true
+            end
+    end
+    -- 
+    game.print({'', 'Registration ', station.backer_name, ' in zone ', zone_name, ' length ', length, ' ingress ', ingress, ' egress ', egress})
+    return {
+        zone = zone_name,
+        entity = station,
+        length = length,
+        egress = egress,
+        ingress = ingress
+    }
+end
+
 local function rebuild_station_mapping()
     global.clusterio_trains.stations = {}
     local stations = global.clusterio_trains.stations
@@ -16,10 +54,7 @@ local function rebuild_station_mapping()
             local zone_name = zones_api.find_zone(entity.surface, entity.position)
             if zone_name then
                 found_stations = found_stations + 1
-                stations[entity.unit_number] = {
-                    zone = zone_name,
-                    entity = entity
-                }
+                stations[entity.unit_number] = create_registration(entity, zone_name)
             end
         end
     end
@@ -61,10 +96,7 @@ local function on_built(entity)
     local zone_name = zones_api.find_zone(entity.surface, entity.position)
     if zone_name
     then
-        global.clusterio_trains.stations[entity.unit_number] = {
-            zone = zone_name,
-            entity = entity
-        }
+        global.clusterio_trains.stations[entity.unit_number] = create_registration(entity, zone_name)
         game.print({'', 'Trainstop built inside zone ', zone_name})
     else
         game.print({'', 'Trainstop built outside zone'})
