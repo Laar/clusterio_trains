@@ -1,6 +1,5 @@
 local serialize = require("modules/clusterio/serialize")
 
-
 -- Types --
 -----------
 
@@ -9,14 +8,17 @@ local serialize = require("modules/clusterio/serialize")
 
 ---@class SerializedTrain
 ---@field t [string] Carriage prototype names
----@field d [boolean] Direction of the carriages with respect to the ordering of t
----@field c [table] Inventory
----@field f [table] fluids
----@field g [table] equipment grid 
----@field h [number] health
----@field co [table] colors
----@field b [table] burner information
+---@field cd [SerializedWagon] Wagon information
 ---@field s [table] serialized train schedule
+
+---@class SerializedWagon
+---@field d boolean Direction of the carriages with respect to the ordering of the train
+---@field c table Inventory
+---@field f table? fluids
+---@field g table? equipment grid 
+---@field h number? health
+---@field co table? colors
+---@field b table? burner information
 
 
 -- Helpers --
@@ -126,7 +128,7 @@ local linear_train_position = function (carriages_or_luatrain)
         local half_length = (proto.joint_distance + proto.connection_distance) / 2
         if (idx == 0) then
             -- Offset of the initial wagons centre
-            linear_position = linear_position + proto.collision_box.left_top.y
+            linear_position = linear_position + proto.joint_distance
         else
             linear_position = linear_position + half_length
         end
@@ -201,17 +203,21 @@ local function serialize_train(train)
         send = 1
         sinc = -1
     end
-    -- TODO: health, color
+    -- local strain = {
+    --     t = {}, -- Types
+    --     d = {}, -- Directions
+    --     c = {}, -- Inventory
+    --     f = {}, -- Fluids
+    --     g = {}, -- Grid
+    --     h = {}, -- health
+    --     co = {}, -- Colors
+    --     b = {}, -- Burner
+    --      -- schedule, assumed to be present
+    --     s = serialize_schedule(train.schedule)
+    -- }
     local strain = {
         t = {}, -- Types
-        d = {}, -- Directions
-        c = {}, -- Inventory
-        f = {}, -- Fluids
-        g = {}, -- Grid
-        h = {}, -- health
-        co = {}, -- Colors
-        b = {}, -- Burner
-         -- schedule, assumed to be present
+        cd = {}, -- Carriage data
         s = serialize_schedule(train.schedule)
     }
 
@@ -220,7 +226,8 @@ local function serialize_train(train)
         cid = cid + 1
         local carriage = train.carriages[sind]
         strain.t[cid] = carriage.name
-        strain.d[cid] = carriage.is_headed_to_trains_front == forwards
+        local cd = {}
+        cd.d = carriage.is_headed_to_trains_front == forwards
         -- Inventory
         local inventories = {}
         for i = 1, carriage.get_max_inventory_index() do
@@ -229,7 +236,7 @@ local function serialize_train(train)
                 inventories[i] = serialize.serialize_inventory(inventory)
             end
         end
-        strain.c[cid] = inventories
+        cd.c = inventories
         -- Fluids
         local fluidbox = carriage.fluidbox
         if #fluidbox > 0 then
@@ -237,26 +244,27 @@ local function serialize_train(train)
             for i = 1, #fluidbox do
                 fluids[i] = fluidbox[i]
             end
-            strain.f[cid] = fluids
+            cd.f = fluids
         end
         -- Grid
         if carriage.grid then
-            strain.g[cid] = serialize.serialize_equipment_grid(carriage.grid)
+            cd.g = serialize.serialize_equipment_grid(carriage.grid)
         end
         -- Burner
         if carriage.burner and carriage.burner.currently_burning then
-            strain.b[cid] = {
+            cd.b = {
                 r = carriage.burner.remaining_burning_fuel,
                 b = carriage.burner.currently_burning.name
             }
         end
         if carriage.health ~= carriage.prototype.max_health then
-            strain.h[cid] = carriage.health
+            cd.h = carriage.health
         end
         local co = carriage.color
         if co ~= nil and co ~= carriage.prototype.color then
-            strain.co[cid] = {co.r, co.g, co.b, co.a}
+            cd.co = {co.r, co.g, co.b, co.a}
         end
+        strain.cd[cid] = cd
     end
     return strain
 end
@@ -293,21 +301,32 @@ local function spawn_train(stop, strain, created_entities)
         local interpolant = (rail_distance - target_distance) / rail_length
         local placement_pos = lerp(segment_rails[rail_index].position, segment_rails[rail_index-1].position, interpolant)
         local direction = best_direction(pointing_orientation(segment_rails[rail_index-1].position, segment_rails[rail_index].position))
-        if not strain.d[idx]
+        if not strain.cd[idx].d
         then
             direction = (direction + 4) % 8
         end
-        local et = surface.create_entity{
+        local args = {
             name = ctype,
             position = placement_pos,
             force = game.forces.player,
             direction = direction
         }
-        -- TODO: Handling of not placing trains, merging trains
-        if et then
-            table.insert(created_entities, et)
-        else
+        -- Do not snap for locomotives to have identical behaviour as cargo wagons
+        if game.entity_prototypes[ctype].type == 'locomotive'
+        then
+            args.snap_to_train_stop = false
+        end
+
+        local et = surface.create_entity(args)
+        if et == nil then
             error("Could not create carriage " .. idx)
+        end
+        table.insert(created_entities, et)
+        -- Check against accidental merges. Previous teleport mod notes that
+        -- subsequent deletion will change the train to be in manual mode. This
+        -- can not safely be undone without additional bookkeeping
+        if #et.train.carriages ~= idx then
+            error('Carriage added to incorrect train')
         end
     end
 end
@@ -318,13 +337,14 @@ end
 local function deserialize_train(train_carriages, strain)
     -- Inventory, fluids, grid, burner, schedule
     for cid, carriage in ipairs(train_carriages) do
-        local sinventory = strain.c[cid]
+        local cd = strain.cd[cid]
+        local sinventory = cd.c
         for iidx, sinv in pairs(sinventory) do
             serialize.deserialize_inventory(carriage.get_inventory(iidx), sinv)
         end
 
         -- Fluids
-        local sfluids = strain.f[cid]
+        local sfluids = cd.f
         if sfluids ~= nil then
             local fluidbox = carriage.fluidbox
             for sidx, sfluid in pairs(sfluids) do
@@ -337,22 +357,23 @@ local function deserialize_train(train_carriages, strain)
         end
 
         -- grid
-        local sgrid = strain.g[cid]
+        local sgrid = cd.g
         if sgrid ~= nil then
             serialize.deserialize_equipment_grid(carriage.grid, sgrid)
         end
         -- Burner
-        local sburner = strain.b[cid]
+        local sburner = cd.b
         if sburner ~= nil then
+            game.print({'', 'Deserializing train fuel', game.table_to_json(sburner)})
             local cburner = carriage.burner
             cburner.currently_burning = game.item_prototypes[sburner.b]
             cburner.remaining_burning_fuel = sburner.r
         end
-        if strain.h[cid] ~= nil then
-            carriage.health = strain.h[cid]
+        if cd.h ~= nil then
+            carriage.health = cd.h
         end
-        if strain.co[cid] ~= nil then
-            carriage.color = strain.co[cid]
+        if cd.co ~= nil then
+            carriage.color = cd.co
         end
     end
     train_carriages[1].train.schedule = deserizalize_schedule(strain.s)
