@@ -111,7 +111,7 @@ local linear_train_position = function (carriages_or_luatrain)
         local next_proto = function (carriages, i)
             i = i + 1
             local v = carriages[i]
-            if v then 
+            if v then
                 return i, v.name
             end
         end
@@ -128,7 +128,7 @@ local linear_train_position = function (carriages_or_luatrain)
         local half_length = (proto.joint_distance + proto.connection_distance) / 2
         if (idx == 0) then
             -- Offset of the initial wagons centre
-            linear_position = linear_position + proto.joint_distance
+            linear_position = linear_position + proto.connection_distance
         else
             linear_position = linear_position + half_length
         end
@@ -203,18 +203,6 @@ local function serialize_train(train)
         send = 1
         sinc = -1
     end
-    -- local strain = {
-    --     t = {}, -- Types
-    --     d = {}, -- Directions
-    --     c = {}, -- Inventory
-    --     f = {}, -- Fluids
-    --     g = {}, -- Grid
-    --     h = {}, -- health
-    --     co = {}, -- Colors
-    --     b = {}, -- Burner
-    --      -- schedule, assumed to be present
-    --     s = serialize_schedule(train.schedule)
-    -- }
     local strain = {
         t = {}, -- Types
         cd = {}, -- Carriage data
