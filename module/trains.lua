@@ -267,11 +267,11 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
         -- game.print({'', 'Not at a station'})
     elseif new_state == defines.train_state.wait_station then
         -- Waiting at a station
-        local zone_name = stations_api.lookup_station_zone(station)
-        if zone_name == nil then
-            -- game.print({'', 'Not stopped in a zone'})
+        local registration = stations_api.lookup_station(station)
+        if registration == nil or not registration.egress then
             return
         end
+        local zone_name = registration.zone
         local zone = zones_api.lookup_zone(zone_name)
         local link = zone and zone.link
         if link == nil then

@@ -117,17 +117,13 @@ end
 
 -- Interface --
 ---------------
----Lookup zone corresponding to a station
+
+---Lookup a stations registration
 ---@param entity LuaEntity_TrainStop
----@return zone_name?
-function stations_api.lookup_station_zone(entity)
+---@return StationRegistration?
+function stations_api.lookup_station(entity)
     ensure_valid_stations()
-    local registration = global.clusterio_trains.stations[entity.unit_number]
-    if registration then
-        return registration.zone
-    else
-        return nil
-    end
+    return global.clusterio_trains.stations[entity.unit_number]
 end
 
 --- Lookup a station in a specific zone
