@@ -38,7 +38,9 @@ trains_api.init = function ()
     ---@type {[integer]: ClearenceEntry}
     global.clusterio_trains.clearence_queue = {}
     ---@type [SpawnEntry]
-    global.clusterio_trains.spawn_queue = {}
+    if not global.clusterio_trains.spawn_queue then
+        global.clusterio_trains.spawn_queue = {}
+    end
 end
 
 -- Teleporting --
@@ -228,21 +230,18 @@ trains_api.on_teleport_receive = function (event_data)
     local strain = event.train
     local zone_name = event.zone
     local zone = zones_api.lookup_zone(event.zone)
+    -- Always insert,  just to be safe
+    table.insert(global.clusterio_trains.spawn_queue, {
+        zone_name = zone_name,
+        strain = strain,
+        tick = game.tick
+    })
     if zone == nil then
         game.print({'', 'Warning received train for unknown zone ', zone_name})
-        table.insert(global.clusterio_trains.spawn_queue, {
-            zone_name = zone_name,
-            strain = strain,
-            tick = game.tick
-        })
         return
     end
-    if not create_train(strain, zone.region.surface, zone_name) then
-        table.insert(global.clusterio_trains.spawn_queue, {
-            zone_name = zone_name,
-            strain = strain,
-            tick = game.tick
-        })
+    if create_train(strain, zone.region.surface, zone_name) then
+        global.clusterio_trains.spawn_queue[#global.clusterio_trains.spawn_queue] = nil
     end
 end
 
