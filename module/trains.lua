@@ -107,7 +107,7 @@ local function request_clearence(train, link)
 end
 
 trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
-    for trainId, request in ipairs(global.clusterio_trains.clearence_queue) do
+    for trainId, request in pairs(global.clusterio_trains.clearence_queue) do
         if game.tick - request.tick >= TELEPORT_COOLDOWN_TICKS then
             if not train_teleport_valid(request.train) then
                 -- Not valid for teleporting any more
