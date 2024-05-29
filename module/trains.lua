@@ -66,28 +66,32 @@ end
 local function create_train(strain, surface, zone_name)
     -- Tries to create a serialized train in a given zone
     -- returns a success boolean
-    local target_train_stop = stations_api.find_station_in_zone(zone_name)
-    if target_train_stop == nil
-    then
-        return false
-    end
+    local length = serialize.linear_train_position(strain.t)
+    local stations = stations_api.find_stations({zone=zone_name,ingress=true,length=length})
     local new_train_carriages = {}
-    return xpcall(function ()
-        serialize.spawn_train(target_train_stop, surface, strain, new_train_carriages)
-        if #new_train_carriages ~= #strain.t then
-            error("Incorrect number of entities")
+    for _, station in pairs(stations) do
+        local target_train_stop = station.entity
+        local success = xpcall(function ()
+            serialize.spawn_train(target_train_stop, surface, strain, new_train_carriages)
+            if #new_train_carriages ~= #strain.t then
+                error("Incorrect number of entities")
+            end
+            serialize.deserialize_train(new_train_carriages, strain)
+            local train = new_train_carriages[1].train
+            if train.schedule then
+                train.go_to_station(train.schedule.current)
+            end
+        end, function (error_msg)
+            log(error_msg)
+            for _, e in ipairs(new_train_carriages) do
+                e.destroy()
+            end
+        end)
+        if success then
+            return true
         end
-        serialize.deserialize_train(new_train_carriages, strain)
-        local train = new_train_carriages[1].train
-        if train.schedule then
-            train.go_to_station(train.schedule.current)
-        end
-    end, function (error_msg)
-        log(error_msg)
-        for _, e in ipairs(new_train_carriages) do
-            e.destroy()
-        end
-    end)
+    end
+    return false
 end
 
 ---@param train LuaTrain
