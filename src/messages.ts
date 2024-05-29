@@ -94,10 +94,20 @@ export class InstanceListRequest {
 	static Response = jsonArray(InstanceDetails);
 }
 
-let ClearenceResult = StringEnum(["Ready", "Offline"])
+// let ClearenceResult = StringEnum(["Ready", "Offline", "Failure"])
+let ClearenceResult = Type.Union([
+	Type.Literal("Ready"),
+	Type.Literal("Offline"),
+	Type.Literal("Failure"),
+	Type.Literal("TooLong"),
+	Type.Literal("Full"),
+	Type.Literal("NoIngress"),
+	Type.Literal("NoStations"),
+	Type.Literal("NoZone")
+])
 export type ClearenceResult = Static<typeof ClearenceResult>
 
-let ClearenceResponse = Type.Object({
+export let ClearenceResponse = Type.Object({
 	"result" : ClearenceResult,
 	"id": Type.Number()
 })

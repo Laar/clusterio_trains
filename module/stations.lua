@@ -143,6 +143,23 @@ function stations_api.find_station_in_zone(zone_name)
     return nil
 end
 
+---Lookup stations in teleporting zones
+---@param query {zone?:zone_name, length?: number, ingress?: boolean, egress?: boolean}
+---@return [StationRegistration]
+function stations_api.find_stations(query)
+    ensure_valid_stations()
+    local result = {}
+    for _, station in pairs(global.clusterio_trains.stations) do
+        if query.zone ~= nil and station.zone ~= query.zone then goto continue end
+        if query.length ~= nil and station.length < query.length then goto continue end
+        if query.ingress ~= nil and station.ingress ~= query.ingress then goto continue end
+        if query.egress ~= nil and station.egress ~= query.egress then goto continue end
+        table.insert(result, station)
+        ::continue::
+    end
+    return result
+end
+
 -- Handlers --
 --------------
 ---@param entity LuaEntity_TrainStop

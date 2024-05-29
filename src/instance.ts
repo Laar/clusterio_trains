@@ -2,6 +2,7 @@ import * as lib from "@clusterio/lib";
 import { BaseInstancePlugin } from "@clusterio/host";
 import { ClearenceResponse, InstanceDetails, InstanceListRequest, PluginExampleEvent, PluginExampleRequest, TrainClearenceRequest, TrainTeleportRequest } from "./messages";
 import { Type, Static } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 
 export type ZoneConfig = Record<string, ZoneDefinition>;
 
@@ -248,9 +249,19 @@ export class InstancePlugin extends BaseInstancePlugin {
 	}
 
 	async handleClearenceRequest(event: TrainClearenceRequest) : Promise<ClearenceResponse> {
-		return {
-			id: event.id,
-			result: "Ready"
+		const data = JSON.stringify(event)
+		const rawResponse = await this.sendRcon(`/sc clusterio_trains.trains.request_clearence("${lib.escapeString(data)}")`)
+		this.logger.info(`Received response ${rawResponse}`)
+		const parsedResponse = JSON.parse(rawResponse)
+		if (Value.Check(ClearenceResponse, parsedResponse)) {
+			this.logger.info('Sending valid response')
+			return parsedResponse;
+		} else {
+			this.logger.info('Sending failure response')
+			return {
+				id: event.id,
+				result: "Failure"
+			}
 		}
 	}
 
@@ -260,9 +271,9 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.logger.info(`Teleporting train to instance ${event.instanceId} zone ${request.zone}`)
 		let response
 		if (event.instanceId == this.instance.id) {
-			response = this.handleTeleportRequest(request)
+			response = await this.handleTeleportRequest(request)
 		} else {
-			response = this.instance.sendTo({"instanceId": event.instanceId}, request)
+			response = await this.instance.sendTo({"instanceId": event.instanceId}, request)
 		}
 	}
 	async handleTeleportRequest(request: TrainTeleportRequest) {

@@ -141,6 +141,51 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
     global.clusterio_trains.spawn_queue = updated_spawn_queue
 end
 
+trains_api.request_clearence = function (event_data)
+    ---@type { length: integer, id: integer, zone: string}
+    ---@diagnostic disable-next-line: assign-type-mismatch
+    local event = game.json_to_table(event_data)
+    local id = event.id
+    local zone_name = event.zone
+    local length = event.length
+
+    local zone = zones_api.lookup_zone(zone_name)
+    local response =(function ()
+        if zone == nil then
+            return {result = "NoZone"}
+        end
+        local stations = stations_api.find_stations({zone=zone_name,ingress=true,length=length})
+        if #stations > 0 then
+            -- Suitable stations exist, but are they available?
+            for _, station in pairs(stations) do
+                local ent = station.entity
+                local rail = ent.connected_rail
+                if rail ~= nil and rail.trains_in_block == 0 then
+                    return {result = "Ready"}
+                end
+            end
+            return {result = "Full"}
+        else
+            -- No suitable stations -> figure out why
+            local station = stations_api.find_station_in_zone(zone_name)
+            if station == nil then
+                return {result = "NoStations"}
+            end
+            stations = stations_api.find_stations{zone=zone_name,ingress=true}
+            if #stations == 0 then
+                return {result="NoIngress"}
+            else
+                return {result="TooLong"}
+            end
+        end
+    end)()
+    response.id = id
+
+    local jsonresponse = game.table_to_json(response)
+    game.print({'', 'Responding with: ', jsonresponse})
+    rcon.print(jsonresponse)
+end
+
 trains_api.on_clearence = function (event_data)
     ---@type {id: number, result: string}
     ---@diagnostic disable-next-line: assign-type-mismatch
@@ -153,8 +198,7 @@ trains_api.on_clearence = function (event_data)
         return
     end
     if result ~= 'Ready' then
-        game.print({'', 'Train ', trainId, ' got negative clearence request'})
-        -- TODO: Need to somehow rerequest
+        game.print({'', 'Train ', trainId, ' got negative clearence request with reason ', result})
         return
     end
     local train = queue.train

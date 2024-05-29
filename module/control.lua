@@ -43,6 +43,7 @@ clusterio_trains.zones = {
 }
 
 clusterio_trains.trains = {
+	request_clearence = trains_api.request_clearence,
 	on_clearence = trains_api.on_clearence,
 	on_teleport_receive = trains_api.on_teleport_receive
 }
