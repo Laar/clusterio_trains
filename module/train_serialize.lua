@@ -259,9 +259,10 @@ end
 
 ---Spawn train carriages
 ---@param stop LuaEntity_TrainStop
+---@param surface string # Surface of the trainstop entity
 ---@param strain SerializedTrain
 ---@param created_entities [LuaEntity]
-local function spawn_train(stop, strain, created_entities)
+local function spawn_train(stop, surface, strain, created_entities)
     local total_length, carriage_positions = linear_train_position(strain.t)
     local crail = stop.connected_rail
     if crail == nil then error("Station without connected rail") end

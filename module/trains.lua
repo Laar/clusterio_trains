@@ -57,10 +57,11 @@ local function train_teleport_valid(train)
 end
 
 ---@param strain SerializedTrain
+---@param surface string Name of the surface of the strain stop
 ---@param zone_name zone_name
 ---@return boolean # Whether succesful
 ---@nodiscard
-local function create_train(strain, zone_name)
+local function create_train(strain, surface, zone_name)
     -- Tries to create a serialized train in a given zone
     -- returns a success boolean
     local target_train_stop = stations_api.find_station_in_zone(zone_name)
@@ -70,7 +71,7 @@ local function create_train(strain, zone_name)
     end
     local new_train_carriages = {}
     return xpcall(function ()
-        serialize.spawn_train(target_train_stop, strain, new_train_carriages)
+        serialize.spawn_train(target_train_stop, surface, strain, new_train_carriages)
         if #new_train_carriages ~= #strain.t then
             error("Incorrect number of entities")
         end
@@ -124,7 +125,8 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
         local zone_name = pending.zone_name
         if game.tick - pending.tick > TELEPORT_COOLDOWN_TICKS
         then
-            if create_train(strain, zone_name)
+            local zone = zones_api.lookup_zone(zone_name)
+            if zone ~= nil and create_train(strain, zone.region.surface, zone_name)
             then
                 -- Nothing to do, will remove it from the queue
             else
@@ -223,9 +225,19 @@ trains_api.on_teleport_receive = function (event_data)
     ---@type {zone: zone_name, train: SerializedTrain}
     ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)
-    local zone_name = event.zone
     local strain = event.train
-    if not create_train(strain, zone_name) then
+    local zone_name = event.zone
+    local zone = zones_api.lookup_zone(event.zone)
+    if zone == nil then
+        game.print({'', 'Warning received train for unknown zone ', zone_name})
+        table.insert(global.clusterio_trains.spawn_queue, {
+            zone_name = zone_name,
+            strain = strain,
+            tick = game.tick
+        })
+        return
+    end
+    if not create_train(strain, zone.region.surface, zone_name) then
         table.insert(global.clusterio_trains.spawn_queue, {
             zone_name = zone_name,
             strain = strain,
