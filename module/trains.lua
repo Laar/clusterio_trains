@@ -262,6 +262,7 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
     global.clusterio_trains.clearence_queue[train.id] = nil
     local new_state = train.state
     local station = train.station
+    ---@cast station LuaEntity_TrainStop?
     if station == nil then
         -- game.print({'', 'Not at a station'})
     elseif new_state == defines.train_state.wait_station then
@@ -272,11 +273,11 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
             return
         end
         local zone = zones_api.lookup_zone(zone_name)
-        if zone == nil or zone.link == nil then
+        local link = zone and zone.link
+        if link == nil then
             -- game.print({'', 'Unlinked, disabled or invalid zone'})
             return
         end
-        local link = zone.link
         local instanceName = global.clusterio_trains.instances[link.instanceId].name
 
         game.print({'', 'Stopped at a station in zone ', zone_name, ' target teleport ',
