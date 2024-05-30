@@ -58,7 +58,7 @@ type TeleportIPC = {
 export class InstancePlugin extends BaseInstancePlugin {
 	private instanceDB : Map<number, InstanceDetails> = new Map()
 	private uplinkAvailable? : boolean = undefined
-	private serverAvailable : boolean = false
+	private rconAvailable : boolean = false
 
 	async init() {
 		this.instance.handle(PluginExampleEvent, this.handlePluginExampleEvent.bind(this));
@@ -83,14 +83,13 @@ export class InstancePlugin extends BaseInstancePlugin {
 	}
 
 	async onStart() {
+		this.rconAvailable = true
 		let zones = this.instance.config.get("clusterio_trains.zones");
 		let data = JSON.stringify(zones);
 		this.logger.info(`Uploading zone data ${data}`);
 		this.sendRcon(`/sc clusterio_trains.zones.sync_all("${lib.escapeString(data)}")`);
 		this.sendInstances();
 		// Wait till the initialization has completed
-		this.serverAvailable = true
-
 		if (this.uplinkAvailable === undefined) {
 			this.uplinkAvailable = true
 		}
@@ -110,7 +109,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 	async updateTeleportState() {
 		if (this.uplinkAvailable === undefined)
 			this.logger.error('Undefined uplink status')
-		if (!this.serverAvailable)
+		if (!this.rconAvailable)
 			this.logger.info("Not updating teleporation state due to lack of server")
 		this.logger.info('Setting teleport state: ' + this.uplinkAvailable)
 		await this.instance.server.sendRcon('/c global.clusterio_trains.teleports_active=' + this.uplinkAvailable, true)
@@ -118,7 +117,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 	}
 
 	async onStop() {
-		this.serverAvailable = false
+		this.rconAvailable = false
 	}
 
 	async onPlayerEvent(event: lib.PlayerEvent) {
@@ -145,7 +144,9 @@ export class InstancePlugin extends BaseInstancePlugin {
 			} catch (err: unknown) {
 				if (err instanceof InputValidationError) {
 					this.logger.info(`Command failed with error ${err.message}`);
-					this.sendRcon(`/sc game.print("${err.message}")`);
+					if (this.rconAvailable) {
+						this.sendRcon(`/sc game.print("${err.message}")`);
+					}
 				} else {
 					throw err;
 				}
@@ -230,6 +231,9 @@ export class InstancePlugin extends BaseInstancePlugin {
 		}
 		this.instance.config.set("clusterio_trains.zones", newZones);
 
+		if (!this.rconAvailable) {
+			return // No factorio to sync to
+		}
 		this.logger.info(`Syncing zone ${name}`)
 		if (event.t !== "Delete") {
 			let data = lib.escapeString(JSON.stringify(newZones[name]));
@@ -251,6 +255,10 @@ export class InstancePlugin extends BaseInstancePlugin {
 	}
 
 	async sendInstances() {	 
+		if (!this.rconAvailable) {
+			this.logger.error('Sending instances without running factorio')
+			return
+		}
 		this.logger.info('Overwriting instance list')
 		let data = JSON.stringify(Array.from(this.instanceDB.values()))
 		this.sendRcon(`/sc clusterio_trains.zones.set_instances("${lib.escapeString(data)}")`)
@@ -259,7 +267,9 @@ export class InstancePlugin extends BaseInstancePlugin {
 	async handleInstanceUpdate(event: InstanceUpdateEvent) {
 		let data = JSON.stringify(event)
 		this.instanceDB.set(event.id, event)
-		this.sendRcon(`/c clusterio_trains.zones.set_instance("${lib.escapeString(data)}")`)
+		if (this.rconAvailable) {
+			this.sendRcon(`/c clusterio_trains.zones.set_instance("${lib.escapeString(data)}")`)
+		}
 	}
 
 	// Clearence
@@ -303,10 +313,18 @@ export class InstancePlugin extends BaseInstancePlugin {
 			}
 		}
 		const data = JSON.stringify(response)
-		this.sendRcon(`/sc clusterio_trains.trains.on_clearence("${lib.escapeString(data)}")`)
+		if (this.rconAvailable) {
+			this.sendRcon(`/sc clusterio_trains.trains.on_clearence("${lib.escapeString(data)}")`)
+		}
 	}
 
 	async handleClearenceRequest(event: TrainClearenceRequest) : Promise<ClearenceResponse> {
+		if (!this.rconAvailable) {
+			return {
+				id: event.id,
+				result: "Offline"
+			}
+		}
 		const data = JSON.stringify(event)
 		const rawResponse = await this.sendRcon(`/sc clusterio_trains.trains.request_clearence("${lib.escapeString(data)}")`)
 		this.logger.info(`Received response ${rawResponse}`)
@@ -337,7 +355,11 @@ export class InstancePlugin extends BaseInstancePlugin {
 	async handleTeleportRequest(request: TrainTeleportRequest) {
 		this.logger.info(`Received train for zone ${request.zone}`)
 		let data = JSON.stringify(request)
-		this.sendRcon(`/sc clusterio_trains.trains.on_teleport_receive("${lib.escapeString(data)}")`)
+		if (this.rconAvailable) {
+			this.sendRcon(`/sc clusterio_trains.trains.on_teleport_receive("${lib.escapeString(data)}")`)
+		} else {
+			this.logger.warn('Discarded train as rcon was not available')
+		}
 		return {}
 	}
 }
