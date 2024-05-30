@@ -40,6 +40,8 @@ local trains_api = {
 ----------
 
 trains_api.init = function ()
+    --- Whether teleportation is active
+    global.clusterio_trains.teleports_active = false
     ---@type {[integer]: ClearenceEntry}
     --- Queue of all trains stopped at a registered trainstop
     global.clusterio_trains.clearence_queue = {}
@@ -114,6 +116,9 @@ local function send_clearence_request(train, registration)
         zone = zone_name,
         tick = game.tick
     }
+    if not global.clusterio_trains.teleports_active then
+        return
+    end
     if not link then
         -- Do we want to give userfeedback?
         return
@@ -249,6 +254,10 @@ trains_api.on_clearence = function (event_data)
         -- TODO: Better handling -> zone updates should trigger checking the queue
         global.clusterio_trains.clearence_queue[trainId] = nil
         log('Zone disappeared during clearence')
+        return
+    end
+    if not global.clusterio_trains.teleports_active then
+        -- Teleporting disabled
         return
     end
     if result ~= 'Ready' then

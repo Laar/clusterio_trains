@@ -1,5 +1,5 @@
 import * as lib from "@clusterio/lib";
-import { BaseInstancePlugin } from "@clusterio/host";
+import { BaseInstancePlugin, Instance } from "@clusterio/host";
 import { ClearenceResponse, InstanceDetails, InstanceListRequest, InstanceUpdateEvent, PluginExampleEvent, PluginExampleRequest, TrainClearenceRequest, TrainTeleportRequest } from "./messages";
 import { Type, Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
@@ -57,6 +57,8 @@ type TeleportIPC = {
 
 export class InstancePlugin extends BaseInstancePlugin {
 	private instanceDB : Map<number, InstanceDetails> = new Map()
+	private uplinkAvailable? : boolean = undefined
+	private serverAvailable : boolean = false
 
 	async init() {
 		this.instance.handle(PluginExampleEvent, this.handlePluginExampleEvent.bind(this));
@@ -71,7 +73,6 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.instance.handle(TrainTeleportRequest, this.handleTeleportRequest.bind(this))
 
 		this.instance.handle(InstanceUpdateEvent, this.handleInstanceUpdate.bind(this))
-
 		await this.refreshInstances()
 	}
 
@@ -87,10 +88,37 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.logger.info(`Uploading zone data ${data}`);
 		this.sendRcon(`/sc clusterio_trains.zones.sync_all("${lib.escapeString(data)}")`);
 		this.sendInstances();
+		// Wait till the initialization has completed
+		this.serverAvailable = true
+
+		if (this.uplinkAvailable === undefined) {
+			this.uplinkAvailable = true
+		}
+		await this.updateTeleportState()
+	}
+
+	async onPrepareControllerDisconnect(connection: Instance): Promise<void> {
+		this.uplinkAvailable = false
+		await this.updateTeleportState()
+	}
+
+	onControllerConnectionEvent(event: "close" | "resume" | "drop" | "connect"): void {
+		this.uplinkAvailable = ["resume", "connect"].indexOf(event) != -1
+		this.updateTeleportState()
+	}
+
+	async updateTeleportState() {
+		if (this.uplinkAvailable === undefined)
+			this.logger.error('Undefined uplink status')
+		if (!this.serverAvailable)
+			this.logger.info("Not updating teleporation state due to lack of server")
+		this.logger.info('Setting teleport state: ' + this.uplinkAvailable)
+		await this.instance.server.sendRcon('/c global.clusterio_trains.teleports_active=' + this.uplinkAvailable, true)
+		
 	}
 
 	async onStop() {
-		this.logger.info("instance::onStop");
+		this.serverAvailable = false
 	}
 
 	async onPlayerEvent(event: lib.PlayerEvent) {
