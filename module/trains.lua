@@ -24,7 +24,7 @@ local trains_api = {
 ---@class ClearenceEntry
 ---@field train LuaTrain
 ---@field tick integer
----@field link Link
+---@field zone zone_name
 
 ---@class SpawnEntry
 ---@field zone_name zone_name
@@ -95,16 +95,20 @@ local function create_train(strain, surface, zone_name)
 end
 
 ---@param train LuaTrain
----@param link Link
-local function request_clearence(train, link)
+---@param zone_name zone_name
+local function request_clearence(train, zone_name)
     -- Request clearence for a LuaTrain, assumes that train_teleport_valid
     game.print({'', 'Requesting clearence for train ', train.id})
     local length = serialize.linear_train_position(train)
+    local zone = zones_api.lookup_zone(zone_name)
+    local link = zone and zone.link
+
     global.clusterio_trains.clearence_queue[train.id] = {
         train = train,
-        link = link,
+        zone = zone_name,
         tick = game.tick
     }
+    if not link then return end
     local instance = zones_api.get_instance(link.instanceId)
     if (instance ~= nil and instance.available) then
         clusterio_api.send_json('clustorio_trains_clearence', {
@@ -124,7 +128,7 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
                 global.clusterio_trains.clearence_queue[trainId] = nil
             else
                 -- Will implicitly update the request
-                request_clearence(request.train, request.link)
+                request_clearence(request.train, request.zone)
             end
         end
     end
@@ -213,7 +217,16 @@ trains_api.on_clearence = function (event_data)
         return
     end
     local train = queue.train
-    local link = queue.link
+    local source_zone = queue.zone
+    local zone = zones_api.lookup_zone(source_zone)
+    local link = zone and zone.link
+    if link == nil then
+        -- TODO: Proper handling
+        log('Link disappeared during clearence request')
+        global.clusterio_trains.clearence_queue[trainId] = nil
+        return
+    end
+
     if not train.valid or train.manual_mode or train.station == nil or not train.station.valid then
         return
     end
@@ -285,7 +298,7 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
 
         game.print({'', 'Stopped at a station in zone ', zone_name, ' target teleport ',
             instanceName, ':', link.zoneName })
-        request_clearence(train, link)
+        request_clearence(train, zone_name)
     else
         -- Nothing to do
         -- game.print({'', 'Wrong state'})
