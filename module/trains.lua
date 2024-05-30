@@ -105,12 +105,15 @@ local function request_clearence(train, link)
         link = link,
         tick = game.tick
     }
-    clusterio_api.send_json('clustorio_trains_clearence', {
-        length = length,
-        id = train.id,
-        instanceId = link.instanceId,
-        targetZone = link.zoneName
-    })
+    local instance = zones_api.get_instance(link.instanceId)
+    if (instance ~= nil and instance.available) then
+        clusterio_api.send_json('clustorio_trains_clearence', {
+            length = length,
+            id = train.id,
+            instanceId = link.instanceId,
+            targetZone = link.zoneName
+        })
+    end
 end
 
 trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()

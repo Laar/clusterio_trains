@@ -149,6 +149,13 @@ function zones_api.set_instance(event_data)
 	end
 end
 
+---Lookup an instance by name or id
+---@param instance_id_or_name integer | string
+---@return Instance?
+function zones_api.get_instance(instance_id_or_name)
+	return global.clusterio_trains.instances[instance_id_or_name]
+end
+
 ---Sync the data for a single zone
 ---@param name zone_name
 ---@param zone_data string?

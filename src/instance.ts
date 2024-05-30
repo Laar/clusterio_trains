@@ -236,20 +236,43 @@ export class InstancePlugin extends BaseInstancePlugin {
 
 	// Clearence
 	async handleClearenceIPC(event: ClearenceIPC) {
-		if (!this.instanceDB.has(event.instanceId)) {
-			this.logger.error('Invalid target instance id')
-		}
-		// Handle disconnected
-		const request = new TrainClearenceRequest(
-			event.length,
-			event.id,
-			event.targetZone
-		)
+		const instance = this.instanceDB.get(event.instanceId)
 		let response
-		if(event.instanceId == this.instance.id) {
-			response = await this.handleClearenceRequest(request)
+		if (instance === undefined) {
+			this.logger.error('Invalid target instance id')
+			response = {
+				id: event.id,
+				result: "Failure"
+			}
 		} else {
-			response = await this.instance.sendTo({"instanceId" : event.instanceId}, request)
+			const request = new TrainClearenceRequest(
+				event.length,
+				event.id,
+				event.targetZone
+			)
+			if(event.instanceId == this.instance.id) {
+				response = await this.handleClearenceRequest(request)
+			} else if(!instance.available) {
+				response = {
+					id: event.id,
+					response: "Offline"
+				}
+			} else {
+				response = await this.instance.sendTo({"instanceId" : event.instanceId}, request).catch(error=>{
+					if (error instanceof lib.RequestError && error.message === 'Instance is not running.') {
+						return {
+							id: event.id,
+							result: "Offline"
+						}
+						
+					}
+					this.logger.error(`${error.message}:${error.name}`)
+					return {
+						id: event.id,
+						result: "Failure"
+					}
+				})
+			}
 		}
 		const data = JSON.stringify(response)
 		this.sendRcon(`/sc clusterio_trains.trains.on_clearence("${lib.escapeString(data)}")`)
