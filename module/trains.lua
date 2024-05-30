@@ -41,6 +41,7 @@ local trains_api = {
 
 trains_api.init = function ()
     ---@type {[integer]: ClearenceEntry}
+    --- Queue of all trains stopped at a registered trainstop
     global.clusterio_trains.clearence_queue = {}
     ---@type [SpawnEntry]
     if not global.clusterio_trains.spawn_queue then
@@ -100,10 +101,11 @@ local function create_train(strain, surface, zone_name)
 end
 
 ---@param train LuaTrain
----@param zone_name zone_name
-local function request_clearence(train, zone_name)
+---@param registration StationRegistration
+local function send_clearence_request(train, registration)
     -- Request clearence for a LuaTrain, assumes that train_teleport_valid
     local length = serialize.linear_train_position(train)
+    local zone_name = registration.zone
     local zone = zones_api.lookup_zone(zone_name)
     local link = zone and zone.link
 
@@ -112,7 +114,10 @@ local function request_clearence(train, zone_name)
         zone = zone_name,
         tick = game.tick
     }
-    if not link then return end
+    if not link then
+        -- Do we want to give userfeedback?
+        return
+    end
     local instance = zones_api.get_instance(link.instanceId)
     if (instance ~= nil and instance.available) then
         clusterio_api.send_json('clustorio_trains_clearence', {
@@ -122,21 +127,34 @@ local function request_clearence(train, zone_name)
             targetZone = link.zoneName
         })
     else
-        user_feedback.show_train_clearence_feedback(train, {id = train.id, result = "Offline"})
+        trains_api.on_clearence{
+            id = train.id,
+            result = "Offline"
+        }
     end
 end
 
 trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
     for trainId, request in pairs(global.clusterio_trains.clearence_queue) do
         if game.tick - request.tick >= TELEPORT_COOLDOWN_TICKS then
-            if not train_teleport_valid(request.train) then
-                -- Not valid for teleporting any more
-                global.clusterio_trains.clearence_queue[trainId] = nil
-            else
-                -- Will implicitly update the request
-                request_clearence(request.train, request.zone)
+            global.clusterio_trains.clearence_queue[trainId] = nil
+            local train = request.train
+            if not train.valid or train.manual_mode or not train.station or not train.station.valid then
+                -- Train became invalid or stop disappeared
+                -- Manual mode should have also been caught by the train state change
+                goto continue
             end
+            ---@type LuaEntity_TrainStop
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            local station = train.station
+            local registration = stations_api.lookup_station(station)
+            if not registration then
+                -- Zone disappeared
+                goto continue
+            end
+            send_clearence_request(train, registration)
         end
+        ::continue::
     end
     local updated_spawn_queue = {}
     for _, pending in ipairs(global.clusterio_trains.spawn_queue) do
@@ -217,17 +235,18 @@ trains_api.on_clearence = function (event_data)
     local source_zone = queue.zone
     local zone = zones_api.lookup_zone(source_zone)
     if not queue then
-        game.print({'', 'Train ', trainId, ' was not queued'})
+        -- Train departed or removed from the queue
         return
     end
     local train = queue.train
     if not train.valid then
         global.clusterio_trains.clearence_queue[trainId] = nil
-        -- TODO: Better handling
+        -- TODO: Better handling -> deconstruction of the train should be detected
         log('Train disappeared during clearence')
         return
     end
     if zone == nil then
+        -- TODO: Better handling -> zone updates should trigger checking the queue
         global.clusterio_trains.clearence_queue[trainId] = nil
         log('Zone disappeared during clearence')
         return
@@ -240,7 +259,6 @@ trains_api.on_clearence = function (event_data)
     if link == nil then
         -- TODO: Proper handling
         log('Link disappeared during clearence request')
-        global.clusterio_trains.clearence_queue[trainId] = nil
         return
     end
     -- TODO: Better handling of the case that the station disappears
@@ -304,18 +322,7 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
         if registration == nil or not registration.egress then
             return
         end
-        local zone_name = registration.zone
-        local zone = zones_api.lookup_zone(zone_name)
-        local link = zone and zone.link
-        if link == nil then
-            -- game.print({'', 'Unlinked, disabled or invalid zone'})
-            return
-        end
-        local instanceName = global.clusterio_trains.instances[link.instanceId].name
-
-        game.print({'', 'Stopped at a station in zone ', zone_name, ' target teleport ',
-            instanceName, ':', link.zoneName })
-        request_clearence(train, zone_name)
+        send_clearence_request(train, registration)
     else
         -- Nothing to do
         -- game.print({'', 'Wrong state'})
