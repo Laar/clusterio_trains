@@ -2,6 +2,7 @@ local clusterio_api = require("modules/clusterio/api")
 local stations_api = require("modules/clusterio_trains/stations")
 local zones_api = require("modules/clusterio_trains/zones")
 local serialize = require("modules/clusterio_trains/train_serialize")
+local user_feedback = require("modules/clusterio_trains/user_feedback")
 
 -- CONSTANTS
 
@@ -25,6 +26,10 @@ local trains_api = {
 ---@field train LuaTrain
 ---@field tick integer
 ---@field zone zone_name
+
+---@class ClearenceResponse
+---@field id integer
+---@field result string
 
 ---@class SpawnEntry
 ---@field zone_name zone_name
@@ -98,7 +103,6 @@ end
 ---@param zone_name zone_name
 local function request_clearence(train, zone_name)
     -- Request clearence for a LuaTrain, assumes that train_teleport_valid
-    game.print({'', 'Requesting clearence for train ', train.id})
     local length = serialize.linear_train_position(train)
     local zone = zones_api.lookup_zone(zone_name)
     local link = zone and zone.link
@@ -117,6 +121,8 @@ local function request_clearence(train, zone_name)
             instanceId = link.instanceId,
             targetZone = link.zoneName
         })
+    else
+        user_feedback.show_train_clearence_feedback(train, {id = train.id, result = "Offline"})
     end
 end
 
@@ -202,23 +208,34 @@ trains_api.request_clearence = function (event_data)
 end
 
 trains_api.on_clearence = function (event_data)
-    ---@type {id: number, result: string}
+    ---@type ClearenceResponse
     ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)
     local trainId = event.id
     local result = event.result
     local queue = global.clusterio_trains.clearence_queue[trainId]
+    local source_zone = queue.zone
+    local zone = zones_api.lookup_zone(source_zone)
     if not queue then
         game.print({'', 'Train ', trainId, ' was not queued'})
         return
     end
-    if result ~= 'Ready' then
-        game.print({'', 'Train ', trainId, ' got negative clearence request with reason ', result})
+    local train = queue.train
+    if not train.valid then
+        global.clusterio_trains.clearence_queue[trainId] = nil
+        -- TODO: Better handling
+        log('Train disappeared during clearence')
         return
     end
-    local train = queue.train
-    local source_zone = queue.zone
-    local zone = zones_api.lookup_zone(source_zone)
+    if zone == nil then
+        global.clusterio_trains.clearence_queue[trainId] = nil
+        log('Zone disappeared during clearence')
+        return
+    end
+    if result ~= 'Ready' then
+        user_feedback.show_train_clearence_feedback(queue.train, event)
+        return
+    end
     local link = zone and zone.link
     if link == nil then
         -- TODO: Proper handling
@@ -226,8 +243,8 @@ trains_api.on_clearence = function (event_data)
         global.clusterio_trains.clearence_queue[trainId] = nil
         return
     end
-
-    if not train.valid or train.manual_mode or train.station == nil or not train.station.valid then
+    -- TODO: Better handling of the case that the station disappears
+    if train.manual_mode or train.station == nil or not train.station.valid then
         return
     end
     -- Start actual teleport
