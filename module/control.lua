@@ -35,6 +35,7 @@ clusterio_trains.on_nth_tick = trains_api.on_nth_tick
 clusterio_trains.zones = {
 	sync_all = zones_api.sync_all,
 	sync = zones_api.sync,
+	set_instance = zones_api.set_instance,
 	set_instances = zones_api.set_instances,
 	add = zones_api.add,
 	delete = zones_api.delete,

@@ -1,6 +1,6 @@
 import * as lib from "@clusterio/lib";
 import { BaseInstancePlugin } from "@clusterio/host";
-import { ClearenceResponse, InstanceDetails, InstanceListRequest, PluginExampleEvent, PluginExampleRequest, TrainClearenceRequest, TrainTeleportRequest } from "./messages";
+import { ClearenceResponse, InstanceDetails, InstanceListRequest, InstanceUpdateEvent, PluginExampleEvent, PluginExampleRequest, TrainClearenceRequest, TrainTeleportRequest } from "./messages";
 import { Type, Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 
@@ -70,6 +70,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.instance.server.handle("clusterio_trains_teleport", this.handleTeleportIPC.bind(this))
 		this.instance.handle(TrainTeleportRequest, this.handleTeleportRequest.bind(this))
 
+		this.instance.handle(InstanceUpdateEvent, this.handleInstanceUpdate.bind(this))
 
 		await this.refreshInstances()
 	}
@@ -216,7 +217,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 			= await this.instance.sendTo("controller", new InstanceListRequest())
 		this.instanceDB.clear()
 		instances.forEach(instance => {
-			this.instanceDB.set(instance.id, {id: instance.id, name: instance.name})
+			this.instanceDB.set(instance.id, {id: instance.id, name: instance.name, available: instance.available})
 		})
 		this.logger.info(`Updated instances found ${instances.length}`)
 	}
@@ -225,6 +226,12 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.logger.info('Overwriting instance list')
 		let data = JSON.stringify(Array.from(this.instanceDB.values()))
 		this.sendRcon(`/sc clusterio_trains.zones.set_instances("${lib.escapeString(data)}")`)
+	}
+
+	async handleInstanceUpdate(event: InstanceUpdateEvent) {
+		let data = JSON.stringify(event)
+		this.instanceDB.set(event.id, event)
+		this.sendRcon(`/c clusterio_trains.zones.set_instance("${lib.escapeString(data)}")`)
 	}
 
 	// Clearence

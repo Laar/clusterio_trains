@@ -23,6 +23,7 @@ local zones_api = {}
 --- @class Instance
 --- @field id integer
 --- @field name string
+--- @field available boolean
 
 -- TODO: Surface rename event?
 
@@ -120,13 +121,32 @@ function zones_api.set_instances(instance_data)
 	for _, instance in ipairs(instance_table) do
 		local inst = {
 			id = instance.id,
-			name = instance.name
+			name = instance.name,
+			available = instance.available
 		}
 		instances[instance.id] = inst
 		instances[instance.name] = inst
 	end
 	global.clusterio_trains.instances = instances
 	debug_draw()
+end
+
+function zones_api.set_instance(event_data)
+	---@type Instance
+	---@diagnostic disable-next-line: assign-type-mismatch
+	local event = game.json_to_table(event_data)
+	local current = global.clusterio_trains.instances[event.id]
+	local inst = {
+		id = event.id,
+		name = event.name,
+		available = event.available
+	}
+	global.clusterio_trains.instances[event.id] = inst
+	if current ~= nil and current.name ~= event.name then
+		-- Rename
+		global.clusterio_trains.instances[current.name] = nil
+		global.clusterio_trains.instances[event.name] = inst
+	end
 end
 
 ---Sync the data for a single zone

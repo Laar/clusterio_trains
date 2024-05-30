@@ -1,4 +1,4 @@
-import { plainJson, jsonArray, jsonPrimitive, StringEnum } from "@clusterio/lib";
+import { plainJson, jsonArray, jsonPrimitive, StringEnum, InstanceStatus } from "@clusterio/lib";
 import { Type, Static } from "@sinclair/typebox";
 
 export class PluginExampleEvent {
@@ -57,17 +57,19 @@ export class PluginExampleRequest {
 export class InstanceDetails {
 	constructor(
 		public readonly id: number,
-		public name: string
+		public name: string,
+		public available: boolean
 	) {}
 
 	static jsonSchema = Type.Object({
 		"id": Type.Number(),
-		"name": Type.String()
+		"name": Type.String(),
+		"available": Type.Boolean()
 	})
 
 	static fromJSON(json: Static<typeof InstanceDetails.jsonSchema>) {
 		return new InstanceDetails(
-			json.id, json.name
+			json.id, json.name, json.available
 		)
 	}
 }
@@ -88,10 +90,29 @@ export class InstanceListRequest {
 
 	static instanceResponse = Type.Object({
 		"id": Type.Number(),
-		"name": Type.String()
+		"name": Type.String(),
+		"available": Type.Boolean()
 	})
 
 	static Response = jsonArray(InstanceDetails);
+}
+
+export class InstanceUpdateEvent {
+	declare ["constructor"]: typeof InstanceUpdateEvent
+	static type = "event" as const
+	static src = ["controller"] as const
+	static dst = ["instance"] as const
+	static plugin = "clusterio_trains" as const
+	constructor(
+		public readonly id : number, 
+		public readonly name: string, 
+		public readonly available: boolean
+	) {}
+	
+	static jsonSchema = InstanceListRequest.instanceResponse
+	static fromJSON(json: Static<typeof InstanceUpdateEvent.jsonSchema>) {
+		return new InstanceUpdateEvent(json.id, json.name, json.available)
+	}
 }
 
 // let ClearenceResult = StringEnum(["Ready", "Offline", "Failure"])

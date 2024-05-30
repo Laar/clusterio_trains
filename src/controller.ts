@@ -4,8 +4,10 @@ import { Static } from "@sinclair/typebox";
 
 import {
 	InstanceListRequest,
+	InstanceUpdateEvent,
 	PluginExampleEvent, PluginExampleRequest,
 } from "./messages";
+import { InstanceStatus } from "@clusterio/lib";
 
 export class ControllerPlugin extends BaseControllerPlugin {
 	async init() {
@@ -20,6 +22,17 @@ export class ControllerPlugin extends BaseControllerPlugin {
 
 	async onInstanceConfigFieldChanged(instance: InstanceInfo, field: string, curr: unknown, prev: unknown) {
 		this.logger.info(`controller::onInstanceConfigFieldChanged ${instance.id} ${field}`);
+	}
+
+	async onInstanceStatusChanged(instance: InstanceInfo, prev?: InstanceStatus): Promise<void> {
+		let changed = prev == undefined || ((instance.status == 'running') != (prev == 'running'))
+		if(changed) {
+			this.controller.sendTo("allInstances", new InstanceUpdateEvent(
+				instance.id,
+				instance.config.get("instance.name"),
+				instance.status == 'running'
+			))
+		}
 	}
 
 	async onSaveData() {
@@ -52,7 +65,8 @@ export class ControllerPlugin extends BaseControllerPlugin {
 			let name: string = info.config.get("instance.name")
 			result.push({
 				id: id,
-				name: name
+				name: name,
+				available: info.status == 'running'
 			})
 		})
 		return result
