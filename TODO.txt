@@ -1,0 +1,33 @@
+
+Bigger items to do:
+[x] Checking if the spawn of the train is valid
+[x] Error handling during spawning
+[ ] Proper handling of offline instances
+    [x] During sending of preclearence
+    [x] Preclearence
+    [ ] Spawn
+[x] Checking on clearence if the train is going to fit
+[x] Handling of the in/out stations
+[x] Stations do not need to have rail attached and attached rail can change
+[ ] Matching of teleport zones
+[ ] Runlength encoding of trains
+[x] Multiple stations
+[ ] Keeping trains teleporting if the game reloads
+[ ] GUI
+[ ] Routing
+[x] Checking if there is a connection to the controller
+[ ] Handle deletion of instances
+[ ] Cleanup of the clearence code
+[x] Handle no RCon for instanceUpdate -> Maybe its a problem on the stopping instance
+[ ] Zone updates require trainstop updates
+[ ] Trainstop updates require scanning of trains
+[ ] Checks for trainstop names:
+  [ ] Ingress names and egress names should be different in the same zone
+  [ ] Station names should exist in max 1 zone
+[ ] Safety of teleports against dropping trains
+[ ] Nicer local module structure
+  [ ] Separate rcon interface
+
+
+Notes:
+ - Schedule entries can be temporary, even trainstops
