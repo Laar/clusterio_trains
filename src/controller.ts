@@ -5,14 +5,11 @@ import { Static } from "@sinclair/typebox";
 import {
 	InstanceListRequest,
 	InstanceUpdateEvent,
-	PluginExampleEvent, PluginExampleRequest,
 } from "./messages";
 import { InstanceStatus } from "@clusterio/lib";
 
 export class ControllerPlugin extends BaseControllerPlugin {
 	async init() {
-		this.controller.handle(PluginExampleEvent, this.handlePluginExampleEvent.bind(this));
-		this.controller.handle(PluginExampleRequest, this.handlePluginExampleRequest.bind(this));
 		this.controller.handle(InstanceListRequest, this.handleInstanceListRequest.bind(this))
 	}
 
@@ -45,18 +42,6 @@ export class ControllerPlugin extends BaseControllerPlugin {
 
 	async onPlayerEvent(instance: InstanceInfo, event: lib.PlayerEvent) {
 		this.logger.info(`controller::onPlayerEvent ${instance.id} ${JSON.stringify(event)}`);
-	}
-
-	async handlePluginExampleEvent(event: PluginExampleEvent) {
-		this.logger.info(JSON.stringify(event));
-	}
-
-	async handlePluginExampleRequest(request: PluginExampleRequest) {
-		this.logger.info(JSON.stringify(request));
-		return {
-			myResponseString: request.myString,
-			myResponseNumbers: request.myNumberArray,
-		};
 	}
 
 	async handleInstanceListRequest(request: InstanceListRequest) {

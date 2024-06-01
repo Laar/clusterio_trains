@@ -45,8 +45,6 @@ export const plugin: lib.PluginDeclaration = {
 	},
 
 	messages: [
-		Messages.PluginExampleEvent,
-		Messages.PluginExampleRequest,
 		Messages.InstanceListRequest,
 		Messages.InstanceUpdateEvent,
 		Messages.TrainClearenceRequest,

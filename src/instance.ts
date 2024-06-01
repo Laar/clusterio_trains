@@ -1,6 +1,6 @@
 import * as lib from "@clusterio/lib";
 import { BaseInstancePlugin, Instance } from "@clusterio/host";
-import { ClearenceResponse, InstanceDetails, InstanceListRequest, InstanceUpdateEvent, PluginExampleEvent, PluginExampleRequest, TrainClearenceRequest, TrainTeleportRequest } from "./messages";
+import { ClearenceResponse, InstanceDetails, InstanceListRequest, InstanceUpdateEvent, TrainClearenceRequest, TrainTeleportRequest } from "./messages";
 import { Type, Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 
@@ -61,9 +61,6 @@ export class InstancePlugin extends BaseInstancePlugin {
 	private rconAvailable : boolean = false
 
 	async init() {
-		this.instance.handle(PluginExampleEvent, this.handlePluginExampleEvent.bind(this));
-		this.instance.handle(PluginExampleRequest, this.handlePluginExampleRequest.bind(this));
-
 		this.instance.server.handle("clusterio_trains_zone",
 			this.wrapEventFeedback(this.handleZoneUpdateIPC.bind(this)))
 
@@ -123,18 +120,6 @@ export class InstancePlugin extends BaseInstancePlugin {
 	async onPlayerEvent(event: lib.PlayerEvent) {
 		this.logger.info(`onPlayerEvent::onPlayerEvent ${JSON.stringify(event)}`);
 		// this.sendRcon("/sc clusterio_trains.foo()");
-	}
-
-	async handlePluginExampleEvent(event: PluginExampleEvent) {
-		this.logger.info(JSON.stringify(event));
-	}
-
-	async handlePluginExampleRequest(request: PluginExampleRequest) {
-		this.logger.info(JSON.stringify(request));
-		return {
-			myResponseString: request.myString,
-			myResponseNumbers: request.myNumberArray,
-		};
 	}
 
 	wrapEventFeedback<T>(handler: (event: T) => Promise<void>) : ((event: T) => Promise<void>) {
