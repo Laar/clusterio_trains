@@ -63,8 +63,7 @@ local function create_registration(station, zone_name)
             end
         end
     end
-    -- 
-    game.print({'', 'Registration ', station.backer_name, ' in zone ', zone_name, ' length ', length, ' ingress ', ingress, ' egress ', egress})
+    -- game.print({'', 'Registration ', station.backer_name, ' in zone ', zone_name, ' length ', length, ' ingress ', ingress, ' egress ', egress})
     return {
         zone = zone_name,
         entity = station,

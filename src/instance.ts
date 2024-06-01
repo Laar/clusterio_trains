@@ -109,7 +109,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		if (!this.rconAvailable)
 			this.logger.info("Not updating teleporation state due to lack of server")
 		this.logger.info('Setting teleport state: ' + this.uplinkAvailable)
-		await this.instance.server.sendRcon('/c global.clusterio_trains.teleports_active=' + this.uplinkAvailable, true)
+		await this.instance.server.sendRcon('/sc global.clusterio_trains.teleports_active=' + this.uplinkAvailable, true)
 		
 	}
 
@@ -253,7 +253,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		let data = JSON.stringify(event)
 		this.instanceDB.set(event.id, event)
 		if (this.rconAvailable) {
-			this.sendRcon(`/c clusterio_trains.rcon.set_instance("${lib.escapeString(data)}")`)
+			this.sendRcon(`/sc clusterio_trains.rcon.set_instance("${lib.escapeString(data)}")`)
 		}
 	}
 

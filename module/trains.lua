@@ -216,7 +216,7 @@ trains_api.rcon.request_clearence = function (event_data)
     response.id = id
 
     local jsonresponse = game.table_to_json(response)
-    game.print({'', 'Responding with: ', jsonresponse})
+    -- game.print({'', 'Responding with: ', jsonresponse})
     rcon.print(jsonresponse)
 end
 
