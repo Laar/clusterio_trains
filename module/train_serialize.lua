@@ -353,7 +353,6 @@ local function deserialize_train(train_carriages, strain)
         -- Burner
         local sburner = cd.b
         if sburner ~= nil then
-            game.print({'', 'Deserializing train fuel', game.table_to_json(sburner)})
             local cburner = carriage.burner
             cburner.currently_burning = game.item_prototypes[sburner.b]
             cburner.remaining_burning_fuel = sburner.r
