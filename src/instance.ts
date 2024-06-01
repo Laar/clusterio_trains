@@ -117,11 +117,6 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.rconAvailable = false
 	}
 
-	async onPlayerEvent(event: lib.PlayerEvent) {
-		this.logger.info(`onPlayerEvent::onPlayerEvent ${JSON.stringify(event)}`);
-		// this.sendRcon("/sc clusterio_trains.foo()");
-	}
-
 	wrapEventFeedback<T>(handler: (event: T) => Promise<void>) : ((event: T) => Promise<void>) {
 		return async (event) => {
 			try {
