@@ -55,18 +55,6 @@ end
 -- Teleporting --
 -----------------
 
----Check whether a train is valid for teleporting
----@param train LuaTrain
----@return boolean
-local function train_teleport_valid(train)
-    if not train.valid or train.manual_mode or train.station == nil or not train.station.valid
-    then
-        return false
-    end
-    -- TODO: More indepth checks on the station, e.g. whether in a zone
-    return true
-end
-
 ---@param strain SerializedTrain
 ---@param surface string Name of the surface of the strain stop
 ---@param zone_name zone_name
