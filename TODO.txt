@@ -26,7 +26,7 @@ Bigger items to do:
   [ ] Station names should exist in max 1 zone
 [ ] Safety of teleports against dropping trains
 [ ] Nicer local module structure
-  [ ] Separate rcon interface
+  [x] Separate rcon interface
 
 
 Notes:

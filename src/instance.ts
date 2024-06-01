@@ -87,7 +87,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		let zones = this.instance.config.get("clusterio_trains.zones");
 		let data = JSON.stringify(zones);
 		this.logger.info(`Uploading zone data ${data}`);
-		this.sendRcon(`/sc clusterio_trains.zones.sync_all("${lib.escapeString(data)}")`);
+		this.sendRcon(`/sc clusterio_trains.rcon.sync_all("${lib.escapeString(data)}")`);
 		this.sendInstances();
 		// Wait till the initialization has completed
 		if (this.uplinkAvailable === undefined) {
@@ -237,9 +237,9 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.logger.info(`Syncing zone ${name}`)
 		if (event.t !== "Delete") {
 			let data = lib.escapeString(JSON.stringify(newZones[name]));
-			this.sendRcon(`/sc clusterio_trains.zones.sync("${name}", "${data}")`);
+			this.sendRcon(`/sc clusterio_trains.rcon.sync("${name}", "${data}")`);
 		} else {
-			this.sendRcon(`/sc clusterio_trains.zones.sync("${name}")`);
+			this.sendRcon(`/sc clusterio_trains.rcon.sync("${name}")`);
 		}
 	}
 
@@ -261,14 +261,14 @@ export class InstancePlugin extends BaseInstancePlugin {
 		}
 		this.logger.info('Overwriting instance list')
 		let data = JSON.stringify(Array.from(this.instanceDB.values()))
-		this.sendRcon(`/sc clusterio_trains.zones.set_instances("${lib.escapeString(data)}")`)
+		this.sendRcon(`/sc clusterio_trains.rcon.set_instances("${lib.escapeString(data)}")`)
 	}
 
 	async handleInstanceUpdate(event: InstanceUpdateEvent) {
 		let data = JSON.stringify(event)
 		this.instanceDB.set(event.id, event)
 		if (this.rconAvailable) {
-			this.sendRcon(`/c clusterio_trains.zones.set_instance("${lib.escapeString(data)}")`)
+			this.sendRcon(`/c clusterio_trains.rcon.set_instance("${lib.escapeString(data)}")`)
 		}
 	}
 
@@ -314,7 +314,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		}
 		const data = JSON.stringify(response)
 		if (this.rconAvailable) {
-			this.sendRcon(`/sc clusterio_trains.trains.on_clearence("${lib.escapeString(data)}")`)
+			this.sendRcon(`/sc clusterio_trains.rcon.on_clearence("${lib.escapeString(data)}")`)
 		}
 	}
 
@@ -326,9 +326,17 @@ export class InstancePlugin extends BaseInstancePlugin {
 			}
 		}
 		const data = JSON.stringify(event)
-		const rawResponse = await this.sendRcon(`/sc clusterio_trains.trains.request_clearence("${lib.escapeString(data)}")`)
+		const rawResponse = await this.sendRcon(`/sc clusterio_trains.rcon.request_clearence("${lib.escapeString(data)}")`)
 		this.logger.info(`Received response ${rawResponse}`)
-		const parsedResponse = JSON.parse(rawResponse)
+		let parsedResponse
+		try {
+			parsedResponse = JSON.parse(rawResponse)
+		} catch(e) {
+			parsedResponse = {
+				id: event.id,
+				result: "Failure",
+			}
+		}
 		if (Value.Check(ClearenceResponse, parsedResponse)) {
 			this.logger.info('Sending valid response')
 			return parsedResponse;
@@ -356,7 +364,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.logger.info(`Received train for zone ${request.zone}`)
 		let data = JSON.stringify(request)
 		if (this.rconAvailable) {
-			this.sendRcon(`/sc clusterio_trains.trains.on_teleport_receive("${lib.escapeString(data)}")`)
+			this.sendRcon(`/sc clusterio_trains.rcon.on_teleport_receive("${lib.escapeString(data)}")`)
 		} else {
 			this.logger.warn('Discarded train as rcon was not available')
 		}

@@ -6,7 +6,9 @@ local trains_api = require("modules/clusterio_trains/trains")
 local clusterio_trains = {
 	events = {},
 	on_nth_tick = {},
+	rcon = {},
 }
+
 
 local merge_events = function (apis)
 	local event_keys = {}
@@ -29,24 +31,32 @@ local merge_events = function (apis)
 	end
 	return events
 end
+
+local merge_rcon = function (tables)
+	local result = {}
+	for _, tab in ipairs(tables) do
+		if tab.rcon then
+			for key, handler in pairs(tab.rcon) do
+				if (result[key]) then
+					error('Duplicate rcon function ' .. key)
+				end
+				result[key] = handler
+			end
+		end
+	end
+	return result
+end
+
 clusterio_trains.events = merge_events({stations_api, trains_api})
 clusterio_trains.on_nth_tick = trains_api.on_nth_tick
 
+clusterio_trains.rcon = merge_rcon({zones_api, trains_api})
+
 clusterio_trains.zones = {
-	sync_all = zones_api.sync_all,
-	sync = zones_api.sync,
-	set_instance = zones_api.set_instance,
-	set_instances = zones_api.set_instances,
 	add = zones_api.add,
 	delete = zones_api.delete,
 	link = zones_api.link,
 	debug = zones_api.debug
-}
-
-clusterio_trains.trains = {
-	request_clearence = trains_api.request_clearence,
-	on_clearence = trains_api.on_clearence,
-	on_teleport_receive = trains_api.on_teleport_receive
 }
 
 local function setupGlobalData()

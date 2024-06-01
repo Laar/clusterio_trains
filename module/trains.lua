@@ -16,7 +16,8 @@ TELEPORT_COOLDOWN_TICKS = 120
 
 local trains_api = {
     events = {},
-    on_nth_tick = {}
+    on_nth_tick = {},
+    rcon = {},
 }
 
 -- Types --
@@ -132,10 +133,11 @@ local function send_clearence_request(train, registration)
             targetZone = link.zoneName
         })
     else
-        trains_api.on_clearence{
+        -- TODO: This should not go via json (or rcon)
+        trains_api.rcon.on_clearence(game.table_to_json({
             id = train.id,
             result = "Offline"
-        }
+        }))
     end
 end
 
@@ -185,7 +187,7 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
     global.clusterio_trains.spawn_queue = updated_spawn_queue
 end
 
-trains_api.request_clearence = function (event_data)
+trains_api.rcon.request_clearence = function (event_data)
     ---@type { length: integer, id: integer, zone: string}
     ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)
@@ -230,7 +232,7 @@ trains_api.request_clearence = function (event_data)
     rcon.print(jsonresponse)
 end
 
-trains_api.on_clearence = function (event_data)
+trains_api.rcon.on_clearence = function (event_data)
     ---@type ClearenceResponse
     ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)
@@ -287,7 +289,7 @@ trains_api.on_clearence = function (event_data)
     end
 end
 
-trains_api.on_teleport_receive = function (event_data)
+trains_api.rcon.on_teleport_receive = function (event_data)
     ---@type {zone: zone_name, train: SerializedTrain}
     ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)

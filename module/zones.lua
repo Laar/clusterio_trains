@@ -1,6 +1,8 @@
 local clusterio_api = require("modules/clusterio/api")
 
-local zones_api = {}
+local zones_api = {
+	rcon = {},
+}
 
 --- @alias zone_name string
 ---
@@ -94,7 +96,7 @@ end
 
 --- Set all zones
 --- @param zone_data string
-function zones_api.sync_all(zone_data)
+function zones_api.rcon.sync_all(zone_data)
 	---@type {[zone_name]: Zone}
 	---@diagnostic disable-next-line: assign-type-mismatch
     local zone_table = game.json_to_table(zone_data)
@@ -112,7 +114,7 @@ end
 
 --- Set data of all instances
 --- @param instance_data string
-function zones_api.set_instances(instance_data)
+function zones_api.rcon.set_instances(instance_data)
 	---@type {[integer]: Instance}
 	---@diagnostic disable-next-line: assign-type-mismatch
 	local instance_table = game.json_to_table(instance_data)
@@ -131,7 +133,7 @@ function zones_api.set_instances(instance_data)
 	debug_draw()
 end
 
-function zones_api.set_instance(event_data)
+function zones_api.rcon.set_instance(event_data)
 	---@type Instance
 	---@diagnostic disable-next-line: assign-type-mismatch
 	local event = game.json_to_table(event_data)
@@ -159,7 +161,7 @@ end
 ---Sync the data for a single zone
 ---@param name zone_name
 ---@param zone_data string?
-function zones_api.sync(name, zone_data)
+function zones_api.rcon.sync(name, zone_data)
     if (zone_data)
 	then
 		-- Update
