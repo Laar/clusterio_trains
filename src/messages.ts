@@ -71,6 +71,7 @@ let ClearenceResult = Type.Union([
 	Type.Literal("Full"),
 	Type.Literal("NoIngress"),
 	Type.Literal("NoStations"),
+	Type.Literal("NoSuchStation"),
 	Type.Literal("NoZone")
 ])
 export type ClearenceResult = Static<typeof ClearenceResult>
@@ -93,17 +94,19 @@ export class TrainClearenceRequest {
 	constructor(
 		public readonly length: number,
 		public readonly id: number,
-		public readonly zone: string
+		public readonly zone: string,
+		public readonly station: string
 	) {}
 
 	static jsonSchema = Type.Object({
 		length: Type.Number(),
 		id: Type.Number(),
-		zone: Type.String()
+		zone: Type.String(),
+		station: Type.String()
 	})
 
 	static fromJSON(json: Static<typeof TrainClearenceRequest.jsonSchema>) {
-		return new TrainClearenceRequest(json.length, json.id, json.zone)
+		return new TrainClearenceRequest(json.length, json.id, json.zone, json.station)
 	}
 
 	static Response = plainJson(ClearenceResponse)
@@ -118,18 +121,21 @@ export class TrainTeleportRequest {
 
 	constructor(
 		public readonly zone: string,
-		public readonly train: object
+		public readonly train: object,
+		public readonly station: string
 	) {}
 
 	static jsonSchema = Type.Object({
 		zone: Type.String(),
-		train: Type.Object({})
+		train: Type.Object({}),
+		station: Type.String(),
 	})
 
 	static fromJSON(json: Static<typeof TrainTeleportRequest.jsonSchema>) {
 		return new TrainTeleportRequest(
 			json.zone,
-			json.train
+			json.train,
+			json.station
 		)
 	}
 

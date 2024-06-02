@@ -154,17 +154,67 @@ function stations_api.find_station_in_zone(zone_name)
 end
 
 ---Lookup stations in teleporting zones
----@param query {zone?:zone_name, length?: number, ingress?: boolean, egress?: boolean}
+---@param query {zone?:zone_name, length?: number, ingress?: boolean, egress?: boolean, name?: string}
 ---@return [StationRegistration]
 function stations_api.find_stations(query)
     ensure_valid_stations()
     local result = {}
     for _, station in pairs(stations_global.stations) do
+        local ent = station.entity
+        if not ent.valid then goto continue end
+        if query.name ~= nil and ent.backer_name ~= query.name then goto continue end
         if query.zone ~= nil and station.zone ~= query.zone then goto continue end
         if query.length ~= nil and station.length < query.length then goto continue end
         if query.ingress ~= nil and station.ingress ~= query.ingress then goto continue end
         if query.egress ~= nil and station.egress ~= query.egress then goto continue end
         table.insert(result, station)
+        ::continue::
+    end
+    return result
+end
+
+--- Reverse ipairs
+---@generic T: table, V
+---@param t T
+---@return fun(table: V[], i?: integer):integer, V
+---@return T
+---@return integer i
+local function ripairs(t)
+    local iter = function (a, i)
+        i = i - 1
+        if i == 0 then return nil end
+        local val = a[i]
+        return i, val
+    end
+    return iter, t, #t + 1
+end
+
+--- @alias StationQuery {zone?:zone_name, length?: number, ingress?: boolean, egress?: boolean, name?: string}
+---@param queries [StationQuery] Multiple station queries
+---@return [ [StationRegistration] ] result List of stations matching a query and all subsequent queries
+function stations_api.find_best_stations(queries)
+    local result = {}
+    for _, _ in ipairs(queries) do
+        table.insert(result, {})
+    end
+
+    for _, registration in pairs(stations_global.stations) do
+        local station = registration.entity
+        local best_match = #queries + 1
+        if not station.valid then goto continue end
+
+        for idx, query in ripairs(queries) do
+            if query.name ~= nil and station.backer_name ~= query.name then break end
+            if query.zone ~= nil and registration.zone ~= query.zone then break end
+            if query.length ~= nil and registration.length < query.length then break end
+            if query.ingress ~= nil and registration.ingress ~= query.ingress then break end
+            if query.egress ~= nil and registration.egress ~= query.egress then break end
+            best_match = idx
+        end
+        if best_match <= #queries then
+            log({'', best_match, ' from ', #queries})
+            table.insert(result[best_match], registration)
+        end
         ::continue::
     end
     return result

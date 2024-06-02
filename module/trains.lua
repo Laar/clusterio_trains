@@ -70,13 +70,14 @@ end
 ---@param strain SerializedTrain
 ---@param surface string Name of the surface of the strain stop
 ---@param zone_name zone_name
+---@param station string Station where to create the train
 ---@return boolean # Whether succesful
 ---@nodiscard
-local function create_train(strain, surface, zone_name)
+local function create_train(strain, surface, zone_name, station)
     -- Tries to create a serialized train in a given zone
     -- returns a success boolean
     local length = serialize.linear_train_position(strain.t)
-    local stations = stations_api.find_stations({zone=zone_name,ingress=true,length=length})
+    local stations = stations_api.find_stations({zone=zone_name,ingress=true,length=length, name=station})
     local new_train_carriages = {}
     for _, station in pairs(stations) do
         local target_train_stop = station.entity
@@ -103,6 +104,15 @@ local function create_train(strain, surface, zone_name)
     return false
 end
 
+---Finds the next station name in the schedule
+---@param train LuaTrain
+local function target_station(train)
+    local schedule = train.schedule
+    if not schedule then return end
+    local next_record = schedule.records[(schedule.current% #schedule.records) + 1]
+    return next_record.station
+end
+
 ---@param train LuaTrain
 ---@param registration StationRegistration
 local function send_clearence_request(train, registration)
@@ -124,13 +134,16 @@ local function send_clearence_request(train, registration)
         -- Do we want to give userfeedback?
         return
     end
+
     local instance = zones_api.get_instance(link.instanceId)
     if (instance ~= nil and instance.available) then
         clusterio_api.send_json('clustorio_trains_clearence', {
             length = length,
             id = train.id,
             instanceId = link.instanceId,
-            targetZone = link.zoneName
+            targetZone = link.zoneName,
+            -- TODO: The case where the next part is not a station
+            targetStation = target_station(train) or ""
         })
     else
         -- TODO: This should not go via json (or rcon)
@@ -189,22 +202,29 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
 end
 
 trains_api.rcon.request_clearence = function (event_data)
-    ---@type { length: integer, id: integer, zone: string}
+    ---@type { length: integer, id: integer, zone: string, station: string}
     ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)
     local id = event.id
     local zone_name = event.zone
     local length = event.length
+    local target_station = event.station
 
     local zone = zones_api.lookup_zone(zone_name)
     local response =(function ()
         if zone == nil then
             return {result = "NoZone"}
         end
-        local stations = stations_api.find_stations({zone=zone_name,ingress=true,length=length})
-        if #stations > 0 then
+        local matches, too_long, no_ingress, no_target = table.unpack(stations_api.find_best_stations({
+            {ingress = true},
+            {length = length},
+            {name = target_station},
+            {zone = zone_name}
+        }))
+
+        if #matches > 0 then
             -- Suitable stations exist, but are they available?
-            for _, station in pairs(stations) do
+            for _, station in pairs(matches) do
                 local ent = station.entity
                 local rail = ent.connected_rail
                 if rail ~= nil and rail.trains_in_block == 0 then
@@ -212,18 +232,14 @@ trains_api.rcon.request_clearence = function (event_data)
                 end
             end
             return {result = "Full"}
+        elseif #too_long > 0 then
+            return {result = "TooLong"}
+        elseif #no_ingress > 0 then
+            return {result = "NoIngress"}
+        elseif #no_target > 0 then
+            return { result = "NoSuchStation" }
         else
-            -- No suitable stations -> figure out why
-            local station = stations_api.find_station_in_zone(zone_name)
-            if station == nil then
-                return {result = "NoStations"}
-            end
-            stations = stations_api.find_stations{zone=zone_name,ingress=true}
-            if #stations == 0 then
-                return {result="NoIngress"}
-            else
-                return {result="TooLong"}
-            end
+            return {result = "NoStations"}
         end
     end)()
     response.id = id
@@ -263,6 +279,8 @@ trains_api.rcon.on_clearence = function (event_data)
         -- Teleporting disabled
         return
     end
+    local target_station = target_station(train)
+    if not target_station then return end
     if result ~= 'Ready' then
         user_feedback.show_train_clearence_feedback(queue.train, event)
         return
@@ -282,7 +300,8 @@ trains_api.rcon.on_clearence = function (event_data)
     clusterio_api.send_json("clusterio_trains_teleport", {
         instanceId = link.instanceId,
         targetZone = link.zoneName,
-        train = strain
+        train = strain,
+        station = target_station
     })
     clearence_queue[trainId] = nil
     for _, e in ipairs(train.carriages) do
@@ -291,11 +310,12 @@ trains_api.rcon.on_clearence = function (event_data)
 end
 
 trains_api.rcon.on_teleport_receive = function (event_data)
-    ---@type {zone: zone_name, train: SerializedTrain}
+    ---@type {zone: zone_name, train: SerializedTrain, station: string}
     ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)
     local strain = event.train
     local zone_name = event.zone
+    local station = event.station
     local zone = zones_api.lookup_zone(event.zone)
     -- Always insert,  just to be safe
     table.insert(spawn_queue, {
@@ -307,7 +327,7 @@ trains_api.rcon.on_teleport_receive = function (event_data)
         game.print({'', 'Warning received train for unknown zone ', zone_name})
         return
     end
-    if create_train(strain, zone.region.surface, zone_name) then
+    if create_train(strain, zone.region.surface, zone_name, station) then
         spawn_queue[#spawn_queue] = nil
     end
 end

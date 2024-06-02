@@ -48,12 +48,14 @@ type ClearenceIPC = {
 	id: number
 	instanceId: number
 	targetZone: string
+	targetStation: string
 }
 
 type TeleportIPC = {
 	instanceId: number
 	targetZone: string
 	train: object
+	station: string
 }
 
 export class InstancePlugin extends BaseInstancePlugin {
@@ -267,7 +269,8 @@ export class InstancePlugin extends BaseInstancePlugin {
 			const request = new TrainClearenceRequest(
 				event.length,
 				event.id,
-				event.targetZone
+				event.targetZone,
+				event.targetStation
 			)
 			if(event.instanceId == this.instance.id) {
 				response = await this.handleClearenceRequest(request)
@@ -332,7 +335,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 
 	// Teleport
 	async handleTeleportIPC(event: TeleportIPC) {
-		const request = new TrainTeleportRequest(event.targetZone, event.train)
+		const request = new TrainTeleportRequest(event.targetZone, event.train, event.station)
 		this.logger.info(`Teleporting train to instance ${event.instanceId} zone ${request.zone}`)
 		let response
 		if (event.instanceId == this.instance.id) {
