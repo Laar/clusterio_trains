@@ -73,9 +73,12 @@ clusterio_trains.events[clusterio_api.events.on_server_startup] = function(event
 end
 
 clusterio_trains.on_load = function ()
-	zones_api.on_load()
-	stations_api.on_load()
-	trains_api.on_load()
+	if global.clusterio_trains ~= nil then
+		-- Not safe on the first load due to lacking init
+		zones_api.on_load()
+		stations_api.on_load()
+		trains_api.on_load()
+	end
 end
 
 --- Top level module table that gets registered
