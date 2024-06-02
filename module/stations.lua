@@ -73,13 +73,21 @@ local function create_registration(station, zone_name)
     }
 end
 
+-- Globals --
+-------------
+--- @class StationsGlobal
+--- @field stations {[integer]: StationRegistration}
+--- @field stations_invalid boolean
+
+--- @type StationsGlobal
+local stations_global
+
 -- Reload --
 ------------
 
 local function rebuild_station_mapping()
-    ---@type {[integer]: StationRegistration}
-    global.clusterio_trains.stations = {}
-    local stations = global.clusterio_trains.stations
+    stations_global.stations = {}
+    local stations = stations_global.stations
     local found_stations = 0
     for _, surface in pairs(game.surfaces) do
         for _, entity in pairs(surface.find_entities_filtered{type='train-stop'}) do
@@ -91,17 +99,17 @@ local function rebuild_station_mapping()
             end
         end
     end
-    global.clusterio_trains.station_invalid = false
+    stations_global.stations_invalid = false
     game.print({'', 'Found ', found_stations, ' stations'})
 end
 
 local function ensure_valid_stations()
-    if not global.clusterio_trains.station_invalid then return end
-    local stations = global.clusterio_trains.stations
+    if not stations_global.stations_invalid then return end
+    local stations = stations_global.stations
     for key, registration in pairs(stations) do
         stations[key] = create_registration(registration.entity, registration.zone)
     end
-    global.clusterio_trains.station_invalid = false
+    stations_global.stations_invalid = false
 end
 
 -- Init --
@@ -109,9 +117,16 @@ end
 
 function stations_api.init()
     -- Uses save-specific numbers -> needs updating on reload
-    global.clusterio_trains.stations = {}
-    global.clusterio_trains.station_invalid = true
+    global.clusterio_trains.stations = {
+        stations = {},
+        stations_invalid = false,
+    }
+    stations_api.on_load()
     rebuild_station_mapping()
+end
+
+function stations_api.on_load()
+    stations_global = global.clusterio_trains.stations
 end
 
 -- Interface --
@@ -122,7 +137,7 @@ end
 ---@return StationRegistration?
 function stations_api.lookup_station(entity)
     ensure_valid_stations()
-    return global.clusterio_trains.stations[entity.unit_number]
+    return stations_global.stations[entity.unit_number]
 end
 
 --- Lookup a station in a specific zone
@@ -130,7 +145,7 @@ end
 --- @return LuaEntity_TrainStop?
 function stations_api.find_station_in_zone(zone_name)
     ensure_valid_stations()
-    for _, registration in pairs(global.clusterio_trains.stations) do
+    for _, registration in pairs(stations_global.stations) do
         if (registration.zone == zone_name) then
             return registration.entity
         end
@@ -144,7 +159,7 @@ end
 function stations_api.find_stations(query)
     ensure_valid_stations()
     local result = {}
-    for _, station in pairs(global.clusterio_trains.stations) do
+    for _, station in pairs(stations_global.stations) do
         if query.zone ~= nil and station.zone ~= query.zone then goto continue end
         if query.length ~= nil and station.length < query.length then goto continue end
         if query.ingress ~= nil and station.ingress ~= query.ingress then goto continue end
@@ -162,7 +177,7 @@ local function on_built(entity)
     local zone_name = zones_api.find_zone(entity.surface, entity.position)
     if zone_name
     then
-        global.clusterio_trains.stations[entity.unit_number] = create_registration(entity, zone_name)
+        stations_global.stations[entity.unit_number] = create_registration(entity, zone_name)
         game.print({'', 'Trainstop built inside zone ', zone_name})
     else
         game.print({'', 'Trainstop built outside zone'})
@@ -171,7 +186,7 @@ end
 
 ---@param entity LuaEntity_TrainStop
 local function on_remove(entity)
-    global.clusterio_trains.stations[entity.unit_number] = nil
+    stations_global.stations[entity.unit_number] = nil
     game.print({'', 'Trainstop removed'})
 end
 
@@ -204,7 +219,7 @@ stations_api.events[defines.events.on_built_entity] = function (event)
         ---@cast entity LuaEntity_TrainStop
         on_built(entity)
     elseif invalidation_types[entity.type] then
-        global.clusterio_trains.station_invalid = true
+        stations_global.stations_invalid = true
     end
 end
 
@@ -216,7 +231,7 @@ stations_api.events[defines.events.on_player_mined_entity] = function(event)
         ---@cast entity LuaEntity_TrainStop
         on_remove(entity)
     elseif invalidation_types[entity.type] then
-        global.clusterio_trains.station_invalid = true
+        stations_global.stations_invalid = true
     end
 end
 
@@ -229,7 +244,7 @@ stations_api.events[defines.events.on_robot_built_entity] = function(event)
         ---@cast entity LuaEntity_TrainStop
         on_built(entity)
     elseif invalidation_types[entity.type] then
-        global.clusterio_trains.station_invalid = true
+        stations_global.stations_invalid = true
     end
 end
 ---@param event EventData.on_robot_mined_entity
@@ -240,7 +255,7 @@ stations_api.events[defines.events.on_robot_mined_entity] = function(event)
         ---@cast entity LuaEntity_TrainStop
         on_remove(entity)
     elseif invalidation_types[entity.type] then
-        global.clusterio_trains.station_invalid = true
+        stations_global.stations_invalid = true
     end
 end
 
@@ -253,7 +268,7 @@ stations_api.events[defines.events.script_raised_built] = function(event)
         ---@cast entity LuaEntity_TrainStop
         on_built(entity)
     elseif invalidation_types[entity.type] then
-        global.clusterio_trains.station_invalid = true
+        stations_global.stations_invalid = true
     end
 end
 
@@ -265,7 +280,7 @@ stations_api.events[defines.events.script_raised_destroy] = function(event)
         ---@cast entity LuaEntity_TrainStop
         on_remove(entity)
     elseif invalidation_types[entity.type] then
-        global.clusterio_trains.station_invalid = true
+        stations_global.stations_invalid = true
     end
 end
 
@@ -278,7 +293,7 @@ stations_api.events[defines.events.on_entity_renamed] = function(event)
         ---@cast entity LuaEntity_TrainStop
         on_rename(entity)
     elseif invalidation_types[entity.type] then
-        global.clusterio_trains.station_invalid = true
+        stations_global.stations_invalid = true
     end
 end
 
@@ -290,7 +305,7 @@ stations_api.events[defines.events.on_entity_died] = function (event)
         ---@cast entity LuaEntity_TrainStop
         on_remove(entity)
     elseif invalidation_types[entity.type] then
-        global.clusterio_trains.station_invalid = true
+        stations_global.stations_invalid = true
     end
 end
 

@@ -47,6 +47,13 @@ function zones_api.init()
 	then
 		global.clusterio_trains.instances = {}
 	end
+	zones_api.on_load()
+end
+
+---@type {[zone_name]: Zone}
+local zonesglobal
+function zones_api.on_load()
+	zonesglobal = global.clusterio_trains.zones
 end
 
 local function debug_draw()
@@ -65,7 +72,7 @@ local function debug_draw()
 		return
 	end
 	-- Actual drawing
-	local zones = global.clusterio_trains.zones;
+	local zones = zonesglobal;
 	for zone_name, zone in pairs(zones) do
 		local region = zone.region
         debug_shapes[#debug_shapes + 1] = rendering.draw_rectangle {
@@ -108,6 +115,7 @@ function zones_api.rcon.sync_all(zone_data)
 		end
 	end
 	global.clusterio_trains.zones = zone_table
+	zonesglobal = global.clusterio_trains.zones
 	game.print({'', 'Synced ', zone_count, ' zones'})
 	debug_draw();
 end
@@ -169,9 +177,9 @@ function zones_api.rcon.sync(name, zone_data)
 		---@type Zone
 		---@diagnostic disable-next-line: assign-type-mismatch
 		local zone = game.json_to_table(zone_data);
-		global.clusterio_trains.zones[name] = zone
+		zonesglobal[name] = zone
 	else
-		global.clusterio_trains.zones[name] = nil
+		zonesglobal[name] = nil
 	end
 	debug_draw();
 end
@@ -263,7 +271,7 @@ end
 ---@param name zone_name
 ---@return Zone?
 function zones_api.lookup_zone(name)
-	return global.clusterio_trains.zones[name]
+	return zonesglobal[name]
 end
 
 return zones_api;

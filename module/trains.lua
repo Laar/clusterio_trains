@@ -37,19 +37,31 @@ local trains_api = {
 ---@field strain SerializedTrain
 ---@field tick integer
 
+-- Globals --
+-------------
+
+---@type {[integer]: ClearenceEntry}
+local clearence_queue
+---@type [SpawnEntry]
+local spawn_queue
+
 -- Init --
 ----------
 
 trains_api.init = function ()
     --- Whether teleportation is active
     global.clusterio_trains.teleports_active = false
-    ---@type {[integer]: ClearenceEntry}
     --- Queue of all trains stopped at a registered trainstop
     global.clusterio_trains.clearence_queue = {}
-    ---@type [SpawnEntry]
     if not global.clusterio_trains.spawn_queue then
         global.clusterio_trains.spawn_queue = {}
     end
+    trains_api.on_load()
+end
+
+function trains_api.on_load()
+    clearence_queue = global.clusterio_trains.clearence_queue
+    spawn_queue = global.clusterio_trains.spawn_queue
 end
 
 -- Teleporting --
@@ -100,7 +112,7 @@ local function send_clearence_request(train, registration)
     local zone = zones_api.lookup_zone(zone_name)
     local link = zone and zone.link
 
-    global.clusterio_trains.clearence_queue[train.id] = {
+    clearence_queue[train.id] = {
         train = train,
         zone = zone_name,
         tick = game.tick
@@ -130,9 +142,9 @@ local function send_clearence_request(train, registration)
 end
 
 trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
-    for trainId, request in pairs(global.clusterio_trains.clearence_queue) do
+    for trainId, request in pairs(clearence_queue) do
         if game.tick - request.tick >= TELEPORT_COOLDOWN_TICKS then
-            global.clusterio_trains.clearence_queue[trainId] = nil
+            clearence_queue[trainId] = nil
             local train = request.train
             if not train.valid or train.manual_mode or not train.station or not train.station.valid then
                 -- Train became invalid or stop disappeared
@@ -152,7 +164,7 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
         ::continue::
     end
     local updated_spawn_queue = {}
-    for _, pending in ipairs(global.clusterio_trains.spawn_queue) do
+    for _, pending in ipairs(spawn_queue) do
         local strain = pending.strain
         local zone_name = pending.zone_name
         if game.tick - pending.tick > TELEPORT_COOLDOWN_TICKS
@@ -173,6 +185,7 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
         end
     end
     global.clusterio_trains.spawn_queue = updated_spawn_queue
+    spawn_queue = global.clusterio_trains.spawn_queue
 end
 
 trains_api.rcon.request_clearence = function (event_data)
@@ -235,14 +248,14 @@ trains_api.rcon.on_clearence = function (event_data)
     end
     local train = queue.train
     if not train.valid then
-        global.clusterio_trains.clearence_queue[trainId] = nil
+        clearence_queue[trainId] = nil
         -- TODO: Better handling -> deconstruction of the train should be detected
         log('Train disappeared during clearence')
         return
     end
     if zone == nil then
         -- TODO: Better handling -> zone updates should trigger checking the queue
-        global.clusterio_trains.clearence_queue[trainId] = nil
+        clearence_queue[trainId] = nil
         log('Zone disappeared during clearence')
         return
     end
@@ -271,7 +284,7 @@ trains_api.rcon.on_clearence = function (event_data)
         targetZone = link.zoneName,
         train = strain
     })
-    global.clusterio_trains.clearence_queue[trainId] = nil
+    clearence_queue[trainId] = nil
     for _, e in ipairs(train.carriages) do
         e.destroy()
     end
@@ -285,7 +298,7 @@ trains_api.rcon.on_teleport_receive = function (event_data)
     local zone_name = event.zone
     local zone = zones_api.lookup_zone(event.zone)
     -- Always insert,  just to be safe
-    table.insert(global.clusterio_trains.spawn_queue, {
+    table.insert(spawn_queue, {
         zone_name = zone_name,
         strain = strain,
         tick = game.tick
@@ -295,7 +308,7 @@ trains_api.rcon.on_teleport_receive = function (event_data)
         return
     end
     if create_train(strain, zone.region.surface, zone_name) then
-        global.clusterio_trains.spawn_queue[#global.clusterio_trains.spawn_queue] = nil
+        spawn_queue[#spawn_queue] = nil
     end
 end
 
@@ -309,7 +322,7 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
     if not train.valid then return end
     -- Remove any previous clearence requests, done on any event to prevent
     -- previous requests from hanging around
-    global.clusterio_trains.clearence_queue[train.id] = nil
+    clearence_queue[train.id] = nil
     local new_state = train.state
     local station = train.station
     ---@cast station LuaEntity_TrainStop?
