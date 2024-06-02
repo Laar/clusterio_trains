@@ -3,6 +3,7 @@ import { BaseInstancePlugin, Instance } from "@clusterio/host";
 import { ClearenceResponse, InstanceDetails, InstanceListRequest, InstanceUpdateEvent, TrainClearenceRequest, TrainTeleportRequest } from "./messages";
 import { Type, Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
+import { LuaPartial, fromLuaPartial, fromLuaNull } from "./util/luapartial";
 
 export type ZoneConfig = Record<string, ZoneDefinition>;
 
@@ -35,7 +36,7 @@ enum UpdateType {
 }
 
 type ZoneUpdateIPC = {
-	z : Partial<ZoneDefinition>,
+	z : LuaPartial<ZoneDefinition>,
 	t : UpdateType
 }
 
@@ -181,7 +182,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 					throw new InputValidationError("Zone creation without region")
 				}
 				const region = zone.region
-				let newZone = {name: name, region: region, link: zone.link ?? null}
+				let newZone = {name: name, region: region, link: fromLuaNull(zone.link ?? null)}
 				if (name in zones) {
 					throw new InputValidationError(`Zone ${zone.name} already exists`);
 				}
@@ -194,7 +195,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 				if (!(name in zones)) {
 					throw new InputValidationError(`Zone ${zone.name} does not exists`);
 				}
-				let updatedZone = {...zones[name], ...zone}
+				let updatedZone = {...zones[name], ...fromLuaPartial(zone)}
 				this.validateZone(updatedZone, zones)
 				newZones[name] = updatedZone
 				this.logger.audit(`Updated zone ${zone.name}`)

@@ -204,26 +204,29 @@ function zones_api.delete(name)
 end
 
 function zones_api.link (name, instance_name, target_name)
+	local link
 	if instance_name then
 		local instance = global.clusterio_trains.instances[instance_name]
 		if instance == nil then
 			game.print({'', 'Unknown instance with name ', instance_name})
 			return
 		end
-		clusterio_api.send_json("clusterio_trains_zone", {
-			t = "Update",
-			z = {
-				name = name,
-				link = {
-					instanceId = instance.id,
-					zoneName = target_name
-				}
-			}
-		})
+		link = {
+			instanceId = instance.id,
+			zoneName = target_name
+		}
 	else
-		clusterio_api.send_json("clusterio_trains_zone",
-			'{"t":"Update","z":{"name":"' + name + '","link":null}}')
+		link = {}
 	end
+	local update = {
+		t = "Update",
+		z = {
+			name = name,
+			link = link
+		}
+	}
+	game.print({'', game.table_to_json(update)})
+	clusterio_api.send_json("clusterio_trains_zone", update)
 end
 
 function zones_api.debug()
