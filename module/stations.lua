@@ -212,7 +212,6 @@ function stations_api.find_best_stations(queries)
             best_match = idx
         end
         if best_match <= #queries then
-            log({'', best_match, ' from ', #queries})
             table.insert(result[best_match], registration)
         end
         ::continue::
