@@ -36,6 +36,7 @@ local trains_api = {
 ---@field zone_name zone_name
 ---@field strain SerializedTrain
 ---@field tick integer
+---@field station string
 
 -- Globals --
 -------------
@@ -180,10 +181,11 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
     for _, pending in ipairs(spawn_queue) do
         local strain = pending.strain
         local zone_name = pending.zone_name
+        local station_name = pending.station
         if game.tick - pending.tick > TELEPORT_COOLDOWN_TICKS
         then
             local zone = zones_api.lookup_zone(zone_name)
-            if zone ~= nil and create_train(strain, zone.region.surface, zone_name)
+            if zone ~= nil and create_train(strain, zone.region.surface, zone_name, station_name)
             then
                 -- Nothing to do, will remove it from the queue
             else
@@ -321,7 +323,8 @@ trains_api.rcon.on_teleport_receive = function (event_data)
     table.insert(spawn_queue, {
         zone_name = zone_name,
         strain = strain,
-        tick = game.tick
+        tick = game.tick,
+        station = station
     })
     if zone == nil then
         game.print({'', 'Warning received train for unknown zone ', zone_name})
