@@ -1,4 +1,5 @@
 local clusterio_api = require("modules/clusterio/api")
+local instance_api = require("modules/clusterio_trains/instances")
 local stations_api = require("modules/clusterio_trains/stations")
 local zones_api = require("modules/clusterio_trains/zones")
 local serialize = require("modules/clusterio_trains/train_serialize")
@@ -136,7 +137,7 @@ local function send_clearence_request(train, registration)
         return
     end
 
-    local instance = zones_api.get_instance(link.instanceId)
+    local instance = instance_api.get_instance(link.instanceId)
     if (instance ~= nil and instance.available) then
         clusterio_api.send_json('clustorio_trains_clearence', {
             length = length,

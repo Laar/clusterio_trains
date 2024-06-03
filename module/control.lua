@@ -1,4 +1,5 @@
 local clusterio_api = require("modules/clusterio/api")
+local instance_api = require("modules/clusterio_trains/instances")
 local zones_api = require("modules/clusterio_trains/zones")
 local stations_api = require("modules/clusterio_trains/stations")
 local trains_api = require("modules/clusterio_trains/trains")
@@ -50,7 +51,7 @@ end
 clusterio_trains.events = merge_events({stations_api, trains_api})
 clusterio_trains.on_nth_tick = trains_api.on_nth_tick
 
-clusterio_trains.rcon = merge_rcon({zones_api, trains_api})
+clusterio_trains.rcon = merge_rcon({instance_api, zones_api, trains_api})
 
 clusterio_trains.zones = {
 	add = zones_api.add,
@@ -63,6 +64,7 @@ local function setupGlobalData()
 	if global.clusterio_trains == nil then
 		global.clusterio_trains = {}
 	end
+	instance_api.init()
 	zones_api.init()
 	stations_api.init()
 	trains_api.init()
@@ -75,6 +77,7 @@ end
 clusterio_trains.on_load = function ()
 	if global.clusterio_trains ~= nil then
 		-- Not safe on the first load due to lacking init
+		instance_api.on_load()
 		zones_api.on_load()
 		stations_api.on_load()
 		trains_api.on_load()

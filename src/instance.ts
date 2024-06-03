@@ -244,14 +244,14 @@ export class InstancePlugin extends BaseInstancePlugin {
 		}
 		this.logger.info('Overwriting instance list')
 		let data = JSON.stringify(Array.from(this.instanceDB.values()))
-		this.sendRcon(`/sc clusterio_trains.rcon.set_instances("${lib.escapeString(data)}")`)
+		this.sendRcon(`/c clusterio_trains.rcon.set_instances("${lib.escapeString(data)}")`)
 	}
 
 	async handleInstanceUpdate(event: InstanceUpdateEvent) {
 		let data = JSON.stringify(event)
 		this.instanceDB.set(event.id, event)
 		if (this.rconAvailable) {
-			this.sendRcon(`/sc clusterio_trains.rcon.set_instance("${lib.escapeString(data)}")`)
+			this.sendRcon(`/c clusterio_trains.rcon.set_instance("${lib.escapeString(data)}")`)
 		}
 	}
 

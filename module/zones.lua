@@ -1,4 +1,5 @@
 local clusterio_api = require("modules/clusterio/api")
+local instance_api = require("modules/clusterio_trains/instances")
 
 local zones_api = {
 	rcon = {},
@@ -19,13 +20,8 @@ local zones_api = {
 --- @field y2 number
 ---
 --- @class Link
---- @field instanceId number
+--- @field instanceId instanceId
 --- @field zoneName zone_name
----
---- @class Instance
---- @field id integer
---- @field name string
---- @field available boolean
 
 -- TODO: Surface rename event?
 
@@ -86,7 +82,7 @@ local function debug_draw()
 		local label = {}
 		local link = zone.link
 		if link ~= nil then
-			local target_instance = global.clusterio_trains.instances[link.instanceId]
+			local target_instance = instance_api.get_instance(link.instanceId)
 			local target = target_instance and target_instance.name or zone.link.instanceId
 			label = {'', zone.name, ' -> ', target, ':', link.zoneName}
 		else
@@ -118,52 +114,6 @@ function zones_api.rcon.sync_all(zone_data)
 	zonesglobal = global.clusterio_trains.zones
 	game.print({'', 'Synced ', zone_count, ' zones'})
 	debug_draw();
-end
-
---- Set data of all instances
---- @param instance_data string
-function zones_api.rcon.set_instances(instance_data)
-	---@type {[integer]: Instance}
-	---@diagnostic disable-next-line: assign-type-mismatch
-	local instance_table = game.json_to_table(instance_data)
-	---@type {[integer|string]: Instance}
-	local instances = {}
-	for _, instance in ipairs(instance_table) do
-		local inst = {
-			id = instance.id,
-			name = instance.name,
-			available = instance.available
-		}
-		instances[instance.id] = inst
-		instances[instance.name] = inst
-	end
-	global.clusterio_trains.instances = instances
-	debug_draw()
-end
-
-function zones_api.rcon.set_instance(event_data)
-	---@type Instance
-	---@diagnostic disable-next-line: assign-type-mismatch
-	local event = game.json_to_table(event_data)
-	local current = global.clusterio_trains.instances[event.id]
-	local inst = {
-		id = event.id,
-		name = event.name,
-		available = event.available
-	}
-	global.clusterio_trains.instances[event.id] = inst
-	if current ~= nil and current.name ~= event.name then
-		-- Rename
-		global.clusterio_trains.instances[current.name] = nil
-		global.clusterio_trains.instances[event.name] = inst
-	end
-end
-
----Lookup an instance by name or id
----@param instance_id_or_name integer | string
----@return Instance?
-function zones_api.get_instance(instance_id_or_name)
-	return global.clusterio_trains.instances[instance_id_or_name]
 end
 
 ---Sync the data for a single zone
@@ -214,7 +164,7 @@ end
 function zones_api.link (name, instance_name, target_name)
 	local link
 	if instance_name then
-		local instance = global.clusterio_trains.instances[instance_name]
+		local instance = instance_api.get_instance(instance_name)
 		if instance == nil then
 			game.print({'', 'Unknown instance with name ', instance_name})
 			return
