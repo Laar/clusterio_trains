@@ -11,36 +11,41 @@ export class InstanceDetails {
 	public readonly id: number
 	private _name: string
 	private _status: SimpleInstanceStatus
+	private _stations: string[]
 
-	constructor(id: number, name: string, status: InstanceDetails["_status"]) {
+	constructor(id: number, name: string, status: InstanceDetails["_status"], stations: string[]) {
 		this.id = id
 		this._name = name
 		this._status = status
+		this._stations = stations
 	}
 
 	get name() {return this._name}
 	get status() { return this._status }
-
+	get stations() { return this._stations }
 
 
 	static jsonSchema = Type.Object({
 		"id": Type.Number(),
 		"name": Type.String(),
-		"status": SimpleInstanceStatus
+		"status": SimpleInstanceStatus,
+		"stations": Type.Array(Type.String())
 	})
 
 	static fromJSON(json: Static<typeof InstanceDetails.jsonSchema>) {
 		return new InstanceDetails(
 			json.id,
 			json.name,
-			json.status)
+			json.status,
+			json.stations)
 	}
 
 	toJSON() {
 		return {
 			id: this.id,
 			name: this.name,
-			status: this.status
+			status: this.status,
+			stations: this.stations,
 		}
 	}
 
@@ -48,6 +53,7 @@ export class InstanceDetails {
 		if(this.id != update.id) {throw new Error("Incorrect instance")}
 		if(update.name !== undefined) this._name = update.name
 		if(update.status !== undefined) this._status = update.status
+		if(update.stations !== undefined) this._stations = update.stations
 	}
 }
 
@@ -55,7 +61,8 @@ export class InstanceDetails {
 export const InstanceDetailsPatch = Type.Object({
 	"id": Type.Number(),
 	"name": Type.Optional(Type.String()),
-	"status": Type.Optional(SimpleInstanceStatus)
+	"status": Type.Optional(SimpleInstanceStatus),
+	"stations": Type.Optional(Type.Array(Type.String()))
 })
 export type InstanceDetailsPatch = Static<typeof InstanceDetailsPatch>
 

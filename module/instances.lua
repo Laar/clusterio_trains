@@ -17,11 +17,13 @@ local instanceApi = {
 --- @field id instanceId
 --- @field status InstanceStatus
 --- @field name string
+--- @field stations string[]
 
 --- @class InstanceDataPatch
 --- @field id instanceId
 --- @field name string?
 --- @field status InstanceStatus?
+--- @field stations string[]
 
 ---@type GInstance
 local ginstance
@@ -87,7 +89,8 @@ function instanceApi.rcon.set_instances(instance_data)
         local inst = {
             id = instance.id,
             name = instance.name,
-            status = instance.status
+            status = instance.status,
+            stations = instance.stations,
         }
         data[inst.id] = inst
         names[inst.name] = inst.id
@@ -104,6 +107,7 @@ function instanceApi.rcon.set_instance(event_data)
         id = event.id,
         name = event.name or current.name,
         status = event.status or current.status,
+        stations = event.stations or current.stations,
     }
     ginstance.data[event.id] = inst
     if current and event.name and (current.name ~= inst.name) then

@@ -58,6 +58,10 @@ type TeleportIPC = {
 	station: string
 }
 
+type InstanceDetailsIPC = {
+	stations? : string[]
+}
+
 export class InstancePlugin extends BaseInstancePlugin {
 	private instanceDB : Map<number, InstanceDetails> = new Map()
 	private uplinkAvailable? : boolean = undefined
@@ -73,6 +77,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.instance.handle(TrainTeleportRequest, this.handleTeleportRequest.bind(this))
 
 		this.instance.handle(InstanceDetailsPatchEvent, this.handleInstanceDetailsPatchEvent.bind(this))
+		this.instance.server.handle("clusterio_trains_instancedetails", this.handleInstanceDetailsIPC.bind(this))
 		if (this.uplinkAvailable === undefined) {
 			this.uplinkAvailable = true
 		}
@@ -253,6 +258,13 @@ export class InstancePlugin extends BaseInstancePlugin {
 				this.sendRcon(`/sc clusterio_trains.rcon.set_instance("${lib.escapeString(data)}")`)
 			}
 		}
+	}
+	async handleInstanceDetailsIPC(event: InstanceDetailsIPC) {
+		let patch = {
+			...event,
+			id: this.instance.id
+		}
+		this.instance.sendTo("controller", new InstanceDetailsPatchEvent(patch))
 	}
 
 	async sendInstances() {	 

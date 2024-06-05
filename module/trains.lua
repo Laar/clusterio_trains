@@ -148,6 +148,7 @@ local function send_clearence_request(train, registration)
             targetStation = target_station(train) or ""
         })
     else
+        game.print("Instance offline")
         -- TODO: This should not go via json (or rcon)
         trains_api.rcon.on_clearence(game.table_to_json({
             id = train.id,

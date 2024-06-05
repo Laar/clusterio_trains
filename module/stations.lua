@@ -78,19 +78,44 @@ end
 --- @class StationsGlobal
 --- @field stations {[integer]: StationRegistration}
 --- @field stations_invalid boolean
+--- @field all_stations {[integer]: LuaEntity_TrainStop}
 
 --- @type StationsGlobal
 local stations_global
+
+-- Export --
+------------
+
+local function export_stations()
+    local name_index = {}
+    for unit_number, entity in pairs(stations_global.all_stations) do
+        if entity.valid then
+            name_index[entity.backer_name] = true
+        else
+            stations_global.all_stations[unit_number] = nil
+        end
+    end
+    local names = {}
+    for name, _ in pairs(name_index) do
+        names[#names+1] = name
+    end
+    clusterio_api.send_json("clusterio_trains_instancedetails", {
+        stations = names
+    })
+end
 
 -- Reload --
 ------------
 
 local function rebuild_station_mapping()
     stations_global.stations = {}
+    stations_global.all_stations = {}
     local stations = stations_global.stations
+    local all_stations = stations_global.all_stations
     local found_stations = 0
     for _, surface in pairs(game.surfaces) do
         for _, entity in pairs(surface.find_entities_filtered{type='train-stop'}) do
+            all_stations[entity.unit_number] = entity
             ---@cast entity LuaEntity_TrainStop
             local zone_name = zones_api.find_zone(entity.surface, entity.position)
             if zone_name then
@@ -101,6 +126,7 @@ local function rebuild_station_mapping()
     end
     stations_global.stations_invalid = false
     game.print({'', 'Found ', found_stations, ' stations'})
+    export_stations()
 end
 
 local function ensure_valid_stations()
@@ -223,6 +249,8 @@ end
 --------------
 ---@param entity LuaEntity_TrainStop
 local function on_built(entity)
+    stations_global.all_stations[entity.unit_number] = entity
+    export_stations()
     local zone_name = zones_api.find_zone(entity.surface, entity.position)
     if zone_name
     then
@@ -236,10 +264,13 @@ end
 ---@param entity LuaEntity_TrainStop
 local function on_remove(entity)
     stations_global.stations[entity.unit_number] = nil
+    stations_global.all_stations[entity.unit_number] = nil
+    export_stations()
     game.print({'', 'Trainstop removed'})
 end
 
 local function on_rename(entity)
+    export_stations()
     game.print({'', 'Trainstop renamed'})
 end
 
