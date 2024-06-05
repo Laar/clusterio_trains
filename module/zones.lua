@@ -3,6 +3,7 @@ local instance_api = require("modules/clusterio_trains/instances")
 
 local zones_api = {
 	rcon = {},
+	defines = {},
 }
 
 --- @alias zone_name string
@@ -25,6 +26,12 @@ local zones_api = {
 
 -- TODO: Surface rename event?
 
+--- @class EventData.CT.ZoneChanged
+--- @field name zone_name
+--- @field old Zone
+
+zones_api.defines.on_zone_changed = script.generate_event_name()
+zones_api.defines.on_zones_reload = script.generate_event_name()
 
 function zones_api.init()
     if not global.clusterio_trains.zones
@@ -114,12 +121,14 @@ function zones_api.rcon.sync_all(zone_data)
 	zonesglobal = global.clusterio_trains.zones
 	game.print({'', 'Synced ', zone_count, ' zones'})
 	debug_draw();
+	script.raise_event(zones_api.defines.on_zones_reload, {})
 end
 
 ---Sync the data for a single zone
 ---@param name zone_name
 ---@param zone_data string?
 function zones_api.rcon.sync(name, zone_data)
+	local old_zone = zonesglobal[name]
     if (zone_data)
 	then
 		-- Update
@@ -132,6 +141,7 @@ function zones_api.rcon.sync(name, zone_data)
 		zonesglobal[name] = nil
 	end
 	debug_draw();
+	script.raise_event(zones_api.defines.on_zone_changed, {name = name, old=old_zone})
 end
 
 function zones_api.add(name, x1, y1, x2, y2, surface)

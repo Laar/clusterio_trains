@@ -47,6 +47,9 @@ local clearence_queue
 ---@type [SpawnEntry]
 local spawn_queue
 
+--- @type fun(registration: StationRegistration) => nil
+local check_station
+
 -- Init --
 ----------
 
@@ -58,6 +61,8 @@ trains_api.init = function ()
     if not global.clusterio_trains.spawn_queue then
         global.clusterio_trains.spawn_queue = {}
     end
+    --- @type [StationRegistration] | "everything" | nil
+    global.clusterio_trains.train_rescan = "everything"
     trains_api.on_load()
 end
 
@@ -158,6 +163,22 @@ local function send_clearence_request(train, registration)
 end
 
 trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
+    -- Rescan
+    local rescan = global.clusterio_trains.train_rescan
+    if rescan ~= nil then
+        if rescan == 'everything' then
+            for _, registration in pairs(stations_api.find_stations{}) do
+                check_station(registration)
+            end
+        else
+            --- @cast rescan StationRegistration[]
+            for _, registration in pairs(rescan) do
+                check_station(rescan)
+            end
+        end
+        global.clusterio_trains.train_rescan = nil
+    end
+    -- Resend requests
     for trainId, request in pairs(clearence_queue) do
         if game.tick - request.tick >= TELEPORT_COOLDOWN_TICKS then
             clearence_queue[trainId] = nil
@@ -179,6 +200,7 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
         end
         ::continue::
     end
+    -- Spawn
     local updated_spawn_queue = {}
     for _, pending in ipairs(spawn_queue) do
         local strain = pending.strain
@@ -337,8 +359,33 @@ trains_api.rcon.on_teleport_receive = function (event_data)
     end
 end
 
+---Check a station for a stopped train and put it in the teleport queue if needed
+---@param registration StationRegistration
+check_station = function(registration)
+    local station = registration.entity
+    if not station.valid or not registration.egress then return end
+    local train = station.get_stopped_train()
+    if not train or train.manual_mode or clearence_queue[train.id] ~= nil then return end
+    send_clearence_request(train, registration)
+end
+
 -- Events --
 ------------
+-- TODO: Delay to next work cycle
+
+trains_api.events[stations_api.defines.on_station_data_reload] = function (event)
+    global.clusterio_trains.train_rescan = "everything"
+end
+
+trains_api.events[stations_api.defines.on_station_registration_refresh] = function (event)
+    --- @cast event EventData.CT.StationRegistrationRefresh
+    if global.clusterio_trains.train_rescan == nil then
+        global.clusterio_trains.train_rescan = event.registrations
+    else
+        -- TODO: Merge with previous rescan list
+        global.clusterio_trains.train_rescan = "everything"
+    end
+end
 
 --- Handle train changing
 ---@param event EventData.on_train_changed_state:EventData

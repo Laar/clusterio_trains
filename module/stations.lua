@@ -1,7 +1,9 @@
 local clusterio_api = require("modules/clusterio/api")
 local zones_api = require("modules/clusterio_trains/zones")
+local util = require("util")
 
 local stations_api = {
+    defines = {},
 }
 
 ---@class StationRegistration
@@ -29,6 +31,14 @@ local invalidation_types = {
     ["straight-rail"] = true,
     ["curved-rail"] = true
 }
+
+--- Event that the full station registration data has reloaded
+stations_api.defines.on_station_data_reload = script.generate_event_name()
+--- Event that metadata for station registrations has been refreshed
+stations_api.defines.on_station_registration_refresh = script.generate_event_name()
+
+---@class EventData.CT.StationRegistrationRefresh
+---@field registrations [StationRegistration]
 
 ---Create a staiton registration
 ---@param station LuaEntity_TrainStop
@@ -127,15 +137,27 @@ local function rebuild_station_mapping()
     stations_global.stations_invalid = false
     game.print({'', 'Found ', found_stations, ' stations'})
     export_stations()
+    script.raise_event(stations_api.defines.on_station_data_reload, {})
 end
 
 local function ensure_valid_stations()
     if not stations_global.stations_invalid then return end
     local stations = stations_global.stations
+    --- @type EventData.CT.StationRegistrationRefresh
+    local event = {
+        registrations = {}
+    }
+    local eventRegistrations
     for key, registration in pairs(stations) do
         stations[key] = create_registration(registration.entity, registration.zone)
+        if not util.table.compare(registration, stations[key]) then
+            eventRegistrations[#eventRegistrations+1] = stations[key]
+        end
     end
     stations_global.stations_invalid = false
+    if #event.registrations ~= 0 then
+        script.raise_event(stations_api.defines.on_station_registration_refresh, event)
+    end
 end
 
 -- Init --
@@ -148,6 +170,7 @@ function stations_api.init()
         stations_invalid = false,
     }
     stations_api.on_load()
+    -- Needs to be called manually as events are not yet registered
     rebuild_station_mapping()
 end
 
@@ -288,6 +311,16 @@ end
 
 -- Script teleport?
 stations_api.events = {}
+
+-- Internal
+stations_api.events[zones_api.defines.on_zones_reload] = function (event)
+    rebuild_station_mapping()
+end
+
+stations_api.events[zones_api.defines.on_zone_changed] = function (event)
+    --- @cast event EventData.CT.ZoneChanged
+    rebuild_station_mapping()
+end
 
 -- Player
 

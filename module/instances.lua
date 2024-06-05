@@ -1,7 +1,10 @@
 -- Module goal: Storage of instance related information
 
+util = require("util")
+
 local instanceApi = {
-    rcon = {}
+    rcon = {},
+    defines = {},
 }
 
 --- @alias instanceId integer
@@ -27,6 +30,17 @@ local instanceApi = {
 
 ---@type GInstance
 local ginstance
+
+-- Event names --
+
+--- Event raised when the station data has changed
+instanceApi.defines.on_stations_changed = script.generate_event_name()
+--- Event raised after an instance changed it name
+instanceApi.defines.on_instance_name_changed = script.generate_event_name()
+--- Event raised after an instance changed its state
+instanceApi.defines.on_instance_state_changed = script.generate_event_name()
+--- Even raised after all instance data has been replaced
+instanceApi.defines.on_instance_data_reload = script.generate_event_name()
 
 function instanceApi.init()
     if global.clusterio_trains.instance == nil then
@@ -57,6 +71,11 @@ local function get_instance_data(idOrName)
     return id and ginstance.data[id]
 end
 instanceApi.get_instance = get_instance_data
+
+---@return { [integer]: InstanceData }
+function instanceApi.get_all_instances()
+    return ginstance.data
+end
 
 --- Is an instance available
 ---@param idOrName instanceIdOrName
@@ -96,6 +115,7 @@ function instanceApi.rcon.set_instances(instance_data)
         names[inst.name] = inst.id
     end
     -- TODO: Event
+    script.raise_event(instanceApi.defines.on_instance_data_reload, {})
 end
 
 function instanceApi.rcon.set_instance(event_data)
@@ -114,8 +134,16 @@ function instanceApi.rcon.set_instance(event_data)
         -- Rename
         ginstance.names[current.name] = nil
         ginstance.names[inst.name] = inst.id
+        script.raise_event(instanceApi.defines.on_instance_name_changed,
+            {id = inst.id, old = current.name, new = inst.name})
     end
-    -- TODO Event
+    if (inst.status ~= current.status) then
+        script.raise_event(instanceApi.defines.on_instance_state_changed,
+        {id = inst.id, old = current.status, new = inst.status})
+    end
+    if (not util.table.compare(inst.stations, current.stations)) then
+        script.raise_event(instanceApi.defines.on_stations_changed, {})
+    end
 end
 
 return instanceApi
