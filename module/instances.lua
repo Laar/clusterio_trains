@@ -11,10 +11,17 @@ local instanceApi = {
 --- @field data {[instanceId]: InstanceData} Mapping id to associated data
 --- @field names {[string]: instanceId} Mapping name to id
 
+--- @alias InstanceStatus "unavailable" | "starting" | "available"
+
 --- @class InstanceData
 --- @field id instanceId
---- @field available boolean
+--- @field status InstanceStatus
 --- @field name string
+
+--- @class InstanceDataPatch
+--- @field id instanceId
+--- @field name string?
+--- @field status InstanceStatus?
 
 ---@type GInstance
 local ginstance
@@ -54,7 +61,7 @@ instanceApi.get_instance = get_instance_data
 ---@return boolean? available
 function instanceApi.available(idOrName)
     local inst = get_instance_data(idOrName)
-    return inst and inst.available
+    return inst and inst.status == "available"
 end
 
 ---@param name string name of the instance
@@ -80,7 +87,7 @@ function instanceApi.rcon.set_instances(instance_data)
         local inst = {
             id = instance.id,
             name = instance.name,
-            available = instance.available
+            status = instance.status
         }
         data[inst.id] = inst
         names[inst.name] = inst.id
@@ -89,17 +96,17 @@ function instanceApi.rcon.set_instances(instance_data)
 end
 
 function instanceApi.rcon.set_instance(event_data)
-    ---@type InstanceData
+    ---@type InstanceDataPatch
 	---@diagnostic disable-next-line: assign-type-mismatch
 	local event = game.json_to_table(event_data)
 	local current = ginstance.data[event.id]
     local inst = {
         id = event.id,
-        name = event.name,
-        available = event.available,
+        name = event.name or current.name,
+        status = event.status or current.status,
     }
     ginstance.data[event.id] = inst
-    if current and (current.name ~= inst.name) then
+    if current and event.name and (current.name ~= inst.name) then
         -- Rename
         ginstance.names[current.name] = nil
         ginstance.names[inst.name] = inst.id

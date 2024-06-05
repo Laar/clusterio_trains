@@ -1,64 +1,103 @@
-import { plainJson, jsonArray, jsonPrimitive, StringEnum, InstanceStatus } from "@clusterio/lib";
+import { plainJson, jsonArray, jsonPrimitive, StringEnum } from "@clusterio/lib";
 import { Type, Static } from "@sinclair/typebox";
 
+export const SimpleInstanceStatus = Type.Union([
+	Type.Literal("unavailable"),
+	Type.Literal("starting"),
+	Type.Literal("available")])
+export type SimpleInstanceStatus = Static<typeof SimpleInstanceStatus>
+
 export class InstanceDetails {
-	constructor(
-		public readonly id: number,
-		public name: string,
-		public available: boolean
-	) {}
+	public readonly id: number
+	private _name: string
+	private _status: SimpleInstanceStatus
+
+	constructor(id: number, name: string, status: InstanceDetails["_status"]) {
+		this.id = id
+		this._name = name
+		this._status = status
+	}
+
+	get name() {return this._name}
+	get status() { return this._status }
+
+
 
 	static jsonSchema = Type.Object({
 		"id": Type.Number(),
 		"name": Type.String(),
-		"available": Type.Boolean()
+		"status": SimpleInstanceStatus
 	})
 
 	static fromJSON(json: Static<typeof InstanceDetails.jsonSchema>) {
 		return new InstanceDetails(
-			json.id, json.name, json.available
-		)
+			json.id,
+			json.name,
+			json.status)
+	}
+
+	toJSON() {
+		return {
+			id: this.id,
+			name: this.name,
+			status: this.status
+		}
+	}
+
+	public patch(update: InstanceDetailsPatch) : void {
+		if(this.id != update.id) {throw new Error("Incorrect instance")}
+		if(update.name !== undefined) this._name = update.name
+		if(update.status !== undefined) this._status = update.status
 	}
 }
 
-export class InstanceListRequest {
-	declare ["constructor"]: typeof InstanceListRequest
+// This would be nicer with the Type.Mapped
+export const InstanceDetailsPatch = Type.Object({
+	"id": Type.Number(),
+	"name": Type.Optional(Type.String()),
+	"status": Type.Optional(SimpleInstanceStatus)
+})
+export type InstanceDetailsPatch = Static<typeof InstanceDetailsPatch>
+
+// Request to the controller to get all instance details
+export class InstanceDetailsListRequest {
+	declare ["constructor"]: typeof InstanceDetailsListRequest
 	static type = "request" as const
 	static src = ["instance"] as const
 	static dst = ["controller"] as const
 	static plugin = "clusterio_trains" as const
-	// static permission = ""
+
 	constructor() {}
 	static jsonSchema = Type.Object({})
-
-	static fromJSON(json: Static<typeof InstanceListRequest.jsonSchema>) {
-		return new InstanceListRequest()
+	static fromJSON(json: Static<typeof InstanceDetailsListRequest.jsonSchema>) {
+		return new InstanceDetailsListRequest()
 	}
 
-	static instanceResponse = Type.Object({
-		"id": Type.Number(),
-		"name": Type.String(),
-		"available": Type.Boolean()
-	})
-
-	static Response = jsonArray(InstanceDetails);
+	static Response = jsonArray(InstanceDetails)
 }
 
-export class InstanceUpdateEvent {
-	declare ["constructor"]: typeof InstanceUpdateEvent
+export class InstanceDetailsPatchEvent {
+	declare ["constructor"]: typeof InstanceDetailsPatchEvent
 	static type = "event" as const
-	static src = ["controller"] as const
-	static dst = ["instance"] as const
+	static src = ["instance", "controller"] as const
+	static dst = ["instance", "controller"] as const
 	static plugin = "clusterio_trains" as const
-	constructor(
-		public readonly id : number, 
-		public readonly name: string, 
-		public readonly available: boolean
-	) {}
-	
-	static jsonSchema = InstanceListRequest.instanceResponse
-	static fromJSON(json: Static<typeof InstanceUpdateEvent.jsonSchema>) {
-		return new InstanceUpdateEvent(json.id, json.name, json.available)
+
+	private _patch: InstanceDetailsPatch
+	public constructor(patch: InstanceDetailsPatch) {
+		this._patch = patch
+	}
+
+	get patch() {
+		return this._patch
+	}
+
+	static jsonSchema = InstanceDetailsPatch
+	static fromJSON(json: Static<typeof InstanceDetailsPatch>) {
+		return new InstanceDetailsPatchEvent(json)
+	}
+	toJSON() {
+		return this._patch;
 	}
 }
 

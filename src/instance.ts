@@ -1,6 +1,6 @@
 import * as lib from "@clusterio/lib";
 import { BaseInstancePlugin, Instance } from "@clusterio/host";
-import { ClearenceResponse, InstanceDetails, InstanceListRequest, InstanceUpdateEvent, TrainClearenceRequest, TrainTeleportRequest } from "./messages";
+import { ClearenceResponse, InstanceDetails, InstanceDetailsListRequest, InstanceDetailsPatchEvent, TrainClearenceRequest, TrainTeleportRequest } from "./messages";
 import { Type, Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import { LuaPartial, fromLuaPartial, fromLuaNull } from "./util/luapartial";
@@ -72,8 +72,11 @@ export class InstancePlugin extends BaseInstancePlugin {
 		this.instance.server.handle("clusterio_trains_teleport", this.handleTeleportIPC.bind(this))
 		this.instance.handle(TrainTeleportRequest, this.handleTeleportRequest.bind(this))
 
-		this.instance.handle(InstanceUpdateEvent, this.handleInstanceUpdate.bind(this))
-		await this.refreshInstances()
+		this.instance.handle(InstanceDetailsPatchEvent, this.handleInstanceDetailsPatchEvent.bind(this))
+		if (this.uplinkAvailable === undefined) {
+			this.uplinkAvailable = true
+		}
+		await this.refreshInstancesDB();
 	}
 
 	async onInstanceConfigFieldChanged(field: string, curr: unknown, prev: unknown) {
@@ -87,12 +90,10 @@ export class InstancePlugin extends BaseInstancePlugin {
 		let zones = this.instance.config.get("clusterio_trains.zones");
 		let data = JSON.stringify(zones);
 		this.logger.info(`Uploading zone data ${data}`);
-		this.sendRcon(`/sc clusterio_trains.rcon.sync_all("${lib.escapeString(data)}")`);
-		this.sendInstances();
+		await this.sendRcon(`/sc clusterio_trains.rcon.sync_all("${lib.escapeString(data)}")`);
+		//
+		await this.sendInstances();
 		// Wait till the initialization has completed
-		if (this.uplinkAvailable === undefined) {
-			this.uplinkAvailable = true
-		}
 		await this.updateTeleportState()
 	}
 
@@ -227,14 +228,31 @@ export class InstancePlugin extends BaseInstancePlugin {
 	}
 
 	// Instance
-	async refreshInstances() {
+	async refreshInstancesDB() {
 		let instances : Array<InstanceDetails>
-			= await this.instance.sendTo("controller", new InstanceListRequest())
+			= await this.instance.sendTo("controller", new InstanceDetailsListRequest())
 		this.instanceDB.clear()
 		instances.forEach(instance => {
-			this.instanceDB.set(instance.id, {id: instance.id, name: instance.name, available: instance.available})
+			this.instanceDB.set(instance.id, instance)
 		})
 		this.logger.info(`Updated instances found ${instances.length}`)
+		if (this.rconAvailable) {
+			await this.sendInstances()
+		}
+	}
+
+	async handleInstanceDetailsPatchEvent(event: InstanceDetailsPatchEvent) {
+		const patch = event.patch
+		const updateInstance = this.instanceDB.get(patch.id)
+		if (updateInstance === undefined) {
+			this.refreshInstancesDB()
+		} else {
+			updateInstance.patch(patch)
+			if (this.rconAvailable) {
+				let data = JSON.stringify(updateInstance)
+				this.sendRcon(`/sc clusterio_trains.rcon.set_instance("${lib.escapeString(data)}")`)
+			}
+		}
 	}
 
 	async sendInstances() {	 
@@ -242,17 +260,13 @@ export class InstancePlugin extends BaseInstancePlugin {
 			this.logger.error('Sending instances without running factorio')
 			return
 		}
+		if (this.instanceDB.size == 0) {
+			// Not yet loaded
+			return;
+		}
 		this.logger.info('Overwriting instance list')
 		let data = JSON.stringify(Array.from(this.instanceDB.values()))
-		this.sendRcon(`/c clusterio_trains.rcon.set_instances("${lib.escapeString(data)}")`)
-	}
-
-	async handleInstanceUpdate(event: InstanceUpdateEvent) {
-		let data = JSON.stringify(event)
-		this.instanceDB.set(event.id, event)
-		if (this.rconAvailable) {
-			this.sendRcon(`/c clusterio_trains.rcon.set_instance("${lib.escapeString(data)}")`)
-		}
+		this.sendRcon(`/sc clusterio_trains.rcon.set_instances("${lib.escapeString(data)}")`)
 	}
 
 	// Clearence
@@ -274,7 +288,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 			)
 			if(event.instanceId == this.instance.id) {
 				response = await this.handleClearenceRequest(request)
-			} else if(!instance.available) {
+			} else if(instance.status !== "available") {
 				response = {
 					id: event.id,
 					response: "Offline"

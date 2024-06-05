@@ -138,7 +138,7 @@ local function send_clearence_request(train, registration)
     end
 
     local instance = instance_api.get_instance(link.instanceId)
-    if (instance ~= nil and instance.available) then
+    if (instance ~= nil and instance.status == "available") then
         clusterio_api.send_json('clustorio_trains_clearence', {
             length = length,
             id = train.id,
