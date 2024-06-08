@@ -336,7 +336,7 @@ trains_api.rcon.on_clearence = function (event_data)
 end
 
 trains_api.rcon.on_teleport_receive = function (event_data)
-    ---@type {zone: zone_name, train: SerializedTrain, station: string}
+    ---@type {instance: instanceId, zone: zone_name, train: SerializedTrain, station: string}
     ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)
     local strain = event.train

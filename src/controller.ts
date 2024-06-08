@@ -8,6 +8,7 @@ import {
 	InstanceDetailsPatch,
 	InstanceDetailsListRequest,
 	InstanceDetailsPatchEvent,
+	TrainTeleportRequest,
 } from "./messages";
 import { InstanceStatus } from "@clusterio/lib";
 
@@ -102,5 +103,10 @@ export class ControllerPlugin extends BaseControllerPlugin {
 
 	async onPlayerEvent(instance: InstanceInfo, event: lib.PlayerEvent) {
 		this.logger.info(`controller::onPlayerEvent ${instance.id} ${JSON.stringify(event)}`);
+	}
+
+	async handleTeleportRequest(request: TrainTeleportRequest) {
+		let response = await this.controller.sendTo({"instanceId": request.instance}, request)
+		return response
 	}
 }

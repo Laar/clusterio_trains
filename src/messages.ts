@@ -161,17 +161,19 @@ export class TrainClearenceRequest {
 export class TrainTeleportRequest {
 	declare ["constructor"]: typeof TrainTeleportRequest
 	static type = "request" as const
-	static src = ["instance"] as const
-	static dst = ["instance"] as const
+	static src = ["instance", "controller"] as const
+	static dst = ["instance", "controller"] as const
 	static plugin = "clusterio_trains" as const
 
 	constructor(
+		public readonly instance: number,
 		public readonly zone: string,
 		public readonly train: object,
 		public readonly station: string
 	) {}
 
 	static jsonSchema = Type.Object({
+		instance: Type.Number(),
 		zone: Type.String(),
 		train: Type.Object({}),
 		station: Type.String(),
@@ -179,6 +181,7 @@ export class TrainTeleportRequest {
 
 	static fromJSON(json: Static<typeof TrainTeleportRequest.jsonSchema>) {
 		return new TrainTeleportRequest(
+			json.instance,
 			json.zone,
 			json.train,
 			json.station
