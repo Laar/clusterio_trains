@@ -147,7 +147,7 @@ local function ensure_valid_stations()
     local event = {
         registrations = {}
     }
-    local eventRegistrations
+    local eventRegistrations = {}
     for key, registration in pairs(stations) do
         stations[key] = create_registration(registration.entity, registration.zone)
         if not util.table.compare(registration, stations[key]) then

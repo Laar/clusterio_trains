@@ -22,7 +22,6 @@ local function build_interface(player)
         guiglobal[index].frame.destroy()
     end
 
-    guiglobal[index] = {}
     local anchor = {gui=defines.relative_gui_type.train_gui, position=defines.relative_gui_position.left}
     local frame = player.gui.relative.add{type="frame", anchor=anchor,
         name = "clusterio_trains_frame", caption={'', 'Clusterio Schedule'},
