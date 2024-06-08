@@ -9,6 +9,7 @@ import {
 	InstanceDetailsListRequest,
 	InstanceDetailsPatchEvent,
 	TrainTeleportRequest,
+	TrainIdRequest,
 } from "./messages";
 import { InstanceStatus } from "@clusterio/lib";
 
@@ -29,12 +30,19 @@ function reducedStatus(status: InstanceStatus) : SimpleInstanceStatus {
 	}
 }
 
+type TrainRegistration = {
+	lastInstance: number,
+	localTrainId: number | null
+}
+
 export class ControllerPlugin extends BaseControllerPlugin {
 	private instanceDB : Map<number, InstanceDetails> = new Map()
+	private trainsDB : Map<number, TrainRegistration> = new Map()
 
 	async init() {
 		this.controller.handle(InstanceDetailsPatchEvent, this.handleInstancePatchEvent.bind(this))
 		this.controller.handle(InstanceDetailsListRequest, this.handleInstanceDetailsListRequest.bind(this))
+		this.controller.handle(TrainIdRequest, this.handleTrainIdRequest.bind(this))
 
 		this.controller.instances.forEach((val, id) => {
 			this.instanceDB.set(id, new InstanceDetails(id,
@@ -105,7 +113,18 @@ export class ControllerPlugin extends BaseControllerPlugin {
 		this.logger.info(`controller::onPlayerEvent ${instance.id} ${JSON.stringify(event)}`);
 	}
 
+	async handleTrainIdRequest(request : TrainIdRequest) : Promise<Static<typeof TrainIdRequest.Response.jsonSchema>>{
+		const nextId = Array.from(this.trainsDB.keys()).reduce((a, b) => a < b ? b : a, 0) + 1
+		this.trainsDB.set(nextId, {lastInstance: request.instance, localTrainId: request.trainId})
+		return {id: nextId, trainId: request.trainId}
+	}
+
 	async handleTeleportRequest(request: TrainTeleportRequest) {
+		const trainId = request.trainId
+		const registrion = this.trainsDB.get(trainId)
+		if (registrion !== undefined) {
+			registrion.lastInstance = request.instance
+		}
 		let response = await this.controller.sendTo({"instanceId": request.instance}, request)
 		return response
 	}

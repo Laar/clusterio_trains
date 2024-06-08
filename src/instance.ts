@@ -1,6 +1,6 @@
 import * as lib from "@clusterio/lib";
 import { BaseInstancePlugin, Instance } from "@clusterio/host";
-import { ClearenceResponse, InstanceDetails, InstanceDetailsListRequest, InstanceDetailsPatchEvent, TrainClearenceRequest, TrainTeleportRequest } from "./messages";
+import { ClearenceResponse, InstanceDetails, InstanceDetailsListRequest, InstanceDetailsPatchEvent, TrainClearenceRequest, TrainIdRequest, TrainTeleportRequest } from "./messages";
 import { Type, Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import { LuaPartial, fromLuaPartial, fromLuaNull } from "./util/luapartial";
@@ -52,6 +52,7 @@ type ClearenceIPC = {
 }
 
 type TeleportIPC = {
+	trainId: number
 	instanceId: number
 	targetZone: string
 	train: object
@@ -60,6 +61,10 @@ type TeleportIPC = {
 
 type InstanceDetailsIPC = {
 	stations? : string[]
+}
+
+type TrainIdIPC = {
+	trainId: number
 }
 
 export class InstancePlugin extends BaseInstancePlugin {
@@ -73,11 +78,13 @@ export class InstancePlugin extends BaseInstancePlugin {
 
 		this.instance.server.handle("clustorio_trains_clearence", this.handleClearenceIPC.bind(this))
 		this.instance.handle(TrainClearenceRequest, this.handleClearenceRequest.bind(this))
+		this.instance.server.handle("clusterio_trains_trainid", this.handleTrainIdIPC.bind(this))
 		this.instance.server.handle("clusterio_trains_teleport", this.handleTeleportIPC.bind(this))
 		this.instance.handle(TrainTeleportRequest, this.handleTeleportRequest.bind(this))
 
 		this.instance.handle(InstanceDetailsPatchEvent, this.handleInstanceDetailsPatchEvent.bind(this))
 		this.instance.server.handle("clusterio_trains_instancedetails", this.handleInstanceDetailsIPC.bind(this))
+
 		if (this.uplinkAvailable === undefined) {
 			this.uplinkAvailable = true
 		}
@@ -358,11 +365,24 @@ export class InstancePlugin extends BaseInstancePlugin {
 			}
 		}
 	}
+	// Train registration
+	async handleTrainIdIPC(event: TrainIdIPC) {
+		if (this.uplinkAvailable) {
+			this.logger.info(`Requesting new global train id for train ${event.trainId}`)
+			const request = new TrainIdRequest(this.instance.id, event.trainId)
+			const idResponse = await this.instance.sendTo("controller", request)
+			this.logger.info(`Received global train id ${idResponse.id} for train ${event.trainId}`)
+			if (this.rconAvailable) {
+				const data = JSON.stringify(idResponse)
+				await this.sendRcon(`/c clusterio_trains.rcon.on_train_id("${lib.escapeString(data)}")`)
+			}
+		}
+	}
 
 	// Teleport
 	async handleTeleportIPC(event: TeleportIPC) {
-		const request = new TrainTeleportRequest(event.instanceId, event.targetZone, event.train, event.station)
-		this.logger.info(`Teleporting train to instance ${event.instanceId} zone ${request.zone}`)
+		const request = new TrainTeleportRequest(event.trainId, event.instanceId, event.targetZone, event.train, event.station)
+		this.logger.info(`Teleporting train ${event.trainId} to instance ${event.instanceId} zone ${request.zone}`)
 		let response
 		if (event.instanceId == this.instance.id) {
 			response = await this.handleTeleportRequest(request)
@@ -371,7 +391,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		}
 	}
 	async handleTeleportRequest(request: TrainTeleportRequest) {
-		this.logger.info(`Received train for zone ${request.zone}`)
+		this.logger.info(`Received train ${request.trainId} for zone ${request.zone}`)
 		let data = JSON.stringify(request)
 		if (this.rconAvailable) {
 			this.sendRcon(`/sc clusterio_trains.rcon.on_teleport_receive("${lib.escapeString(data)}")`)

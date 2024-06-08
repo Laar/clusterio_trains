@@ -34,6 +34,7 @@ local trains_api = {
 ---@field result string
 
 ---@class SpawnEntry
+---@field global_train_id number
 ---@field zone_name zone_name
 ---@field strain SerializedTrain
 ---@field tick integer
@@ -46,6 +47,8 @@ local trains_api = {
 local clearence_queue
 ---@type [SpawnEntry]
 local spawn_queue
+---@type{[integer]: integer} Mapping of train id to global train id
+local registered_trains
 
 --- @type fun(registration: StationRegistration) => nil
 local check_station
@@ -61,6 +64,9 @@ trains_api.init = function ()
     if not global.clusterio_trains.spawn_queue then
         global.clusterio_trains.spawn_queue = {}
     end
+    if not global.clusterio_trains.registerted_trains then
+        global.clusterio_trains.registerted_trains = {}
+    end
     --- @type [StationRegistration] | "everything" | nil
     global.clusterio_trains.train_rescan = "everything"
     trains_api.on_load()
@@ -69,6 +75,7 @@ end
 function trains_api.on_load()
     clearence_queue = global.clusterio_trains.clearence_queue
     spawn_queue = global.clusterio_trains.spawn_queue
+    registered_trains = global.clusterio_trains.registerted_trains
 end
 
 -- Teleporting --
@@ -78,14 +85,16 @@ end
 ---@param surface string Name of the surface of the strain stop
 ---@param zone_name zone_name
 ---@param station string Station where to create the train
+---@param global_train_id number Global train id of the new train
 ---@return boolean # Whether succesful
 ---@nodiscard
-local function create_train(strain, surface, zone_name, station)
+local function create_train(strain, surface, zone_name, station, global_train_id)
     -- Tries to create a serialized train in a given zone
     -- returns a success boolean
     local length = serialize.linear_train_position(strain.t)
     local stations = stations_api.find_stations({zone=zone_name,ingress=true,length=length, name=station})
     local new_train_carriages = {}
+    local result_train = nil
     for _, station in pairs(stations) do
         local target_train_stop = station.entity
         local success = xpcall(function ()
@@ -94,10 +103,11 @@ local function create_train(strain, surface, zone_name, station)
                 error("Incorrect number of entities")
             end
             serialize.deserialize_train(new_train_carriages, strain)
-            local train = new_train_carriages[1].train
-            if train.schedule then
-                train.go_to_station(train.schedule.current)
+            result_train = new_train_carriages[1].train
+            if result_train.schedule then
+                result_train.go_to_station(result_train.schedule.current)
             end
+            registered_trains[result_train.id] = global_train_id
         end, function (error_msg)
             log(error_msg)
             for _, e in ipairs(new_train_carriages) do
@@ -121,6 +131,21 @@ local function target_station(train)
 end
 
 ---@param train LuaTrain
+local function request_train_id(train)
+    if not train or not train.valid then return end
+    clusterio_api.send_json("clusterio_trains_trainid", {trainId = train.id})
+end
+
+function trains_api.rcon.on_train_id(event_data)
+    --- @type {id: number, trainId: number}
+    ---@diagnostic disable-next-line: assign-type-mismatch
+    local event = game.json_to_table(event_data)
+    local train = game.get_train_by_id(event.trainId)
+    if not train or not train.valid then return end
+    registered_trains[event.trainId] = event.id
+end
+
+---@param train LuaTrain
 ---@param registration StationRegistration
 local function send_clearence_request(train, registration)
     -- Request clearence for a LuaTrain, assumes that train_teleport_valid
@@ -139,6 +164,12 @@ local function send_clearence_request(train, registration)
     end
     if not link then
         -- Do we want to give userfeedback?
+        return
+    end
+    local gtrainid = registered_trains[train.id]
+    if not gtrainid then
+        -- Unregistered train
+        request_train_id(train)
         return
     end
 
@@ -206,10 +237,11 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
         local strain = pending.strain
         local zone_name = pending.zone_name
         local station_name = pending.station
+        local global_train_id = pending.global_train_id
         if game.tick - pending.tick > TELEPORT_COOLDOWN_TICKS
         then
             local zone = zones_api.lookup_zone(zone_name)
-            if zone ~= nil and create_train(strain, zone.region.surface, zone_name, station_name)
+            if zone ~= nil and create_train(strain, zone.region.surface, zone_name, station_name, global_train_id)
             then
                 -- Nothing to do, will remove it from the queue
             else
@@ -281,7 +313,8 @@ trains_api.rcon.on_clearence = function (event_data)
     local event = game.json_to_table(event_data)
     local trainId = event.id
     local result = event.result
-    local queue = global.clusterio_trains.clearence_queue[trainId]
+    local queue = clearence_queue[trainId]
+    local global_train_id = registered_trains[trainId]
     local source_zone = queue.zone
     local zone = zones_api.lookup_zone(source_zone)
     if not queue then
@@ -293,6 +326,12 @@ trains_api.rcon.on_clearence = function (event_data)
         clearence_queue[trainId] = nil
         -- TODO: Better handling -> deconstruction of the train should be detected
         log('Train disappeared during clearence')
+        return
+    end
+    if global_train_id == nil then
+        -- Should not happen
+        log('Warning received clearence for train without id')
+        request_train_id(train)
         return
     end
     if zone == nil then
@@ -324,6 +363,7 @@ trains_api.rcon.on_clearence = function (event_data)
     -- Start actual teleport
     local strain = serialize.serialize_train(train)
     clusterio_api.send_json("clusterio_trains_teleport", {
+        trainId = global_train_id,
         instanceId = link.instanceId,
         targetZone = link.zoneName,
         train = strain,
@@ -336,15 +376,17 @@ trains_api.rcon.on_clearence = function (event_data)
 end
 
 trains_api.rcon.on_teleport_receive = function (event_data)
-    ---@type {instance: instanceId, zone: zone_name, train: SerializedTrain, station: string}
+    ---@type {trainId: number, instance: instanceId, zone: zone_name, train: SerializedTrain, station: string}
     ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)
+    local global_train_id = event.trainId
     local strain = event.train
     local zone_name = event.zone
     local station = event.station
     local zone = zones_api.lookup_zone(event.zone)
     -- Always insert,  just to be safe
     table.insert(spawn_queue, {
+        global_train_id = global_train_id,
         zone_name = zone_name,
         strain = strain,
         tick = game.tick,
@@ -354,7 +396,7 @@ trains_api.rcon.on_teleport_receive = function (event_data)
         game.print({'', 'Warning received train for unknown zone ', zone_name})
         return
     end
-    if create_train(strain, zone.region.surface, zone_name, station) then
+    if create_train(strain, zone.region.surface, zone_name, station, global_train_id) then
         spawn_queue[#spawn_queue] = nil
     end
 end

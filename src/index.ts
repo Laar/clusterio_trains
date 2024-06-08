@@ -45,6 +45,7 @@ export const plugin: lib.PluginDeclaration = {
 	},
 
 	messages: [
+		Messages.TrainIdRequest,
 		Messages.InstanceDetailsListRequest,
 		Messages.InstanceDetailsPatchEvent,
 		Messages.TrainClearenceRequest,

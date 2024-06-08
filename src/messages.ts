@@ -166,6 +166,7 @@ export class TrainTeleportRequest {
 	static plugin = "clusterio_trains" as const
 
 	constructor(
+		public readonly trainId: number,
 		public readonly instance: number,
 		public readonly zone: string,
 		public readonly train: object,
@@ -173,6 +174,7 @@ export class TrainTeleportRequest {
 	) {}
 
 	static jsonSchema = Type.Object({
+		trainId: Type.Number(),
 		instance: Type.Number(),
 		zone: Type.String(),
 		train: Type.Object({}),
@@ -181,6 +183,7 @@ export class TrainTeleportRequest {
 
 	static fromJSON(json: Static<typeof TrainTeleportRequest.jsonSchema>) {
 		return new TrainTeleportRequest(
+			json.trainId,
 			json.instance,
 			json.zone,
 			json.train,
@@ -189,4 +192,24 @@ export class TrainTeleportRequest {
 	}
 
 	static Response = plainJson(Type.Object({}))
+}
+
+export class TrainIdRequest {
+	declare ["constructor"]: typeof TrainIdRequest
+	static type = "request" as const
+	static src = ["instance"] as const
+	static dst = ["controller"] as const
+	static plugin = "clusterio_trains" as const
+
+	constructor(
+		public readonly instance: number,
+		public readonly trainId: number
+	) {}
+
+	static jsonSchema = Type.Object({instance: Type.Number(), trainId: Type.Number()})
+	static fromJSON(json: Static<typeof TrainIdRequest.jsonSchema>) {
+		return new TrainIdRequest(json.instance, json.trainId)
+	}
+
+	static Response = plainJson(Type.Object({id : Type.Number(), trainId: Type.Number()}))
 }
