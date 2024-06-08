@@ -3,6 +3,7 @@ local instance_api = require("modules/clusterio_trains/instances")
 local zones_api = require("modules/clusterio_trains/zones")
 local stations_api = require("modules/clusterio_trains/stations")
 local trains_api = require("modules/clusterio_trains/trains")
+local gui = require("modules/clusterio_trains/gui")
 
 local clusterio_trains = {
 	events = {},
@@ -48,7 +49,7 @@ local merge_rcon = function (tables)
 	return result
 end
 
-clusterio_trains.events = merge_events({stations_api, trains_api})
+clusterio_trains.events = merge_events({stations_api, trains_api, gui})
 clusterio_trains.on_nth_tick = trains_api.on_nth_tick
 
 clusterio_trains.rcon = merge_rcon({instance_api, zones_api, trains_api})
@@ -68,6 +69,7 @@ local function setupGlobalData()
 	zones_api.init()
 	stations_api.init()
 	trains_api.init()
+	gui.init()
 end
 
 clusterio_trains.events[clusterio_api.events.on_server_startup] = function(event)
@@ -81,6 +83,7 @@ clusterio_trains.on_load = function ()
 		zones_api.on_load()
 		stations_api.on_load()
 		trains_api.on_load()
+		gui.on_load()
 	end
 end
 

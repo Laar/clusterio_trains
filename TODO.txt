@@ -12,15 +12,18 @@ Bigger items to do:
 [ ] Matching of teleport zones
 [ ] Runlength encoding of trains
 [x] Multiple stations
-[ ] Keeping trains teleporting if the game reloads
+[x] Keeping trains teleporting if the game reloads
 [ ] GUI
+  [x] Minimal gui
+  [ ] Filtering
+  [ ] Context based?
 [ ] Routing
 [x] Checking if there is a connection to the controller
 [ ] Handle deletion of instances
 [ ] Cleanup of the clearence code
 [x] Handle no RCon for instanceUpdate -> Maybe its a problem on the stopping instance
-[ ] Zone updates require trainstop updates
-[ ] Trainstop updates require scanning of trains
+[x] Zone updates require trainstop updates
+[x] Trainstop updates require scanning of trains
 [ ] Checks for trainstop names:
   [ ] Ingress names and egress names should be different in the same zone
   [ ] Station names should exist in max 1 zone
