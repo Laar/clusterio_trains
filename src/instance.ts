@@ -1,6 +1,6 @@
 import * as lib from "@clusterio/lib";
 import { BaseInstancePlugin, Instance } from "@clusterio/host";
-import { ClearenceResponse, InstanceDetails, InstanceDetailsListRequest, InstanceDetailsPatchEvent, TrainClearenceRequest, TrainIdRequest, TrainTeleportRequest } from "./messages";
+import { ClearenceResponse, InstanceDetails, InstanceDetailsListRequest, InstanceDetailsPatchEvent, TrainClearenceRequest, TrainIdRequest, TrainIdResponse, TrainTeleportRequest, TrainTeleportResponse } from "./messages";
 import { Type, Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import { LuaPartial, fromLuaPartial, fromLuaNull } from "./util/luapartial";
@@ -370,7 +370,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		if (this.uplinkAvailable) {
 			this.logger.info(`Requesting new global train id for train ${event.trainId}`)
 			const request = new TrainIdRequest(this.instance.id, event.trainId)
-			const idResponse = await this.instance.sendTo("controller", request)
+			const idResponse: TrainIdResponse = await this.instance.sendTo("controller", request)
 			this.logger.info(`Received global train id ${idResponse.id} for train ${event.trainId}`)
 			if (this.rconAvailable) {
 				const data = JSON.stringify(idResponse)
@@ -383,14 +383,14 @@ export class InstancePlugin extends BaseInstancePlugin {
 	async handleTeleportIPC(event: TeleportIPC) {
 		const request = new TrainTeleportRequest(event.trainId, event.instanceId, event.targetZone, event.train, event.station)
 		this.logger.info(`Teleporting train ${event.trainId} to instance ${event.instanceId} zone ${request.zone}`)
-		let response
+		let response : TrainTeleportResponse
 		if (event.instanceId == this.instance.id) {
 			response = await this.handleTeleportRequest(request)
 		} else {
 			response = await this.instance.sendTo({"instanceId": event.instanceId}, request)
 		}
 	}
-	async handleTeleportRequest(request: TrainTeleportRequest) {
+	async handleTeleportRequest(request: TrainTeleportRequest) : Promise<TrainTeleportResponse> {
 		this.logger.info(`Received train ${request.trainId} for zone ${request.zone}`)
 		let data = JSON.stringify(request)
 		if (this.rconAvailable) {

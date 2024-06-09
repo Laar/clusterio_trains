@@ -194,6 +194,9 @@ export class TrainTeleportRequest {
 	static Response = plainJson(Type.Object({}))
 }
 
+export type TrainTeleportResponse 
+	= Static<typeof TrainTeleportRequest.Response.jsonSchema>
+
 export class TrainIdRequest {
 	declare ["constructor"]: typeof TrainIdRequest
 	static type = "request" as const
@@ -213,3 +216,6 @@ export class TrainIdRequest {
 
 	static Response = plainJson(Type.Object({id : Type.Number(), trainId: Type.Number()}))
 }
+
+export type TrainIdResponse
+	= Static<typeof TrainIdRequest.Response.jsonSchema>

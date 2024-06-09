@@ -10,6 +10,8 @@ import {
 	InstanceDetailsPatchEvent,
 	TrainTeleportRequest,
 	TrainIdRequest,
+	TrainTeleportResponse,
+	TrainIdResponse,
 } from "./messages";
 import { InstanceStatus } from "@clusterio/lib";
 
@@ -113,19 +115,23 @@ export class ControllerPlugin extends BaseControllerPlugin {
 		this.logger.info(`controller::onPlayerEvent ${instance.id} ${JSON.stringify(event)}`);
 	}
 
-	async handleTrainIdRequest(request : TrainIdRequest) : Promise<Static<typeof TrainIdRequest.Response.jsonSchema>>{
+	async handleTrainIdRequest(request : TrainIdRequest) : Promise<TrainIdResponse>{
 		const nextId = Array.from(this.trainsDB.keys()).reduce((a, b) => a < b ? b : a, 0) + 1
 		this.trainsDB.set(nextId, {lastInstance: request.instance, localTrainId: request.trainId})
 		return {id: nextId, trainId: request.trainId}
 	}
 
-	async handleTeleportRequest(request: TrainTeleportRequest) {
+	async handleTeleportRequest(request: TrainTeleportRequest) : Promise<TrainTeleportResponse> {
 		const trainId = request.trainId
-		const registrion = this.trainsDB.get(trainId)
-		if (registrion !== undefined) {
-			registrion.lastInstance = request.instance
+		let registrion = this.trainsDB.get(trainId)
+		if (registrion === undefined) {
+			this.logger.warn(`Teleporting unknown train ${request.trainId}`)
+			registrion = {lastInstance: -1, localTrainId: -1}
+			this.trainsDB.set(trainId, registrion)
 		}
-		let response = await this.controller.sendTo({"instanceId": request.instance}, request)
+		registrion.lastInstance = request.instance
+		let response: TrainTeleportResponse
+			= await this.controller.sendTo({"instanceId": request.instance}, request)
 		return response
 	}
-}
+} 
