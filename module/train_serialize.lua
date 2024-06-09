@@ -4,7 +4,7 @@ local serialize = require("modules/clusterio/serialize")
 -----------
 
 ---@class LuaEntity_RollingStock: LuaEntity
--- ---@field train LuaTrain
+---@field train LuaTrain
 
 ---@class SerializedTrain
 ---@field t [string] Carriage prototype names
@@ -53,13 +53,16 @@ end
 local function pointing_orientation(p1, p2)
     local dx = p2.x - p1.x
     local dy = p2.y - p1.y
-    local angle = math.atan2(dy, dx) / (2 * math.pi)
-    angle = -(angle + 0.25)
+    -- Note: The factorio axes & direction do not match regular mathematics
+    -- direction = 0 is north and corresponds with -y
+    -- direction = 0.25 is east and corresponds with +x
+    local angle = math.atan2(dx, -dy) / (2 * math.pi)
     return angle % 1
 end
 
 local function best_direction(orientation)
-    return math.floor(8*orientation + 0.5) % 8
+    -- Note: Direction enum is layed out in the same clockwise direction as the orientation
+    return math.floor(0.5+8*orientation) % 8
 end
 
 -- Train functions --
@@ -289,7 +292,11 @@ local function spawn_train(stop, surface, strain, created_entities)
         end
         local interpolant = (rail_distance - target_distance) / rail_length
         local placement_pos = lerp(segment_rails[rail_index].position, segment_rails[rail_index-1].position, interpolant)
-        local direction = best_direction(pointing_orientation(segment_rails[rail_index-1].position, segment_rails[rail_index].position))
+        -- Note ordering: from back to front
+        local target_orientation = pointing_orientation(
+            segment_rails[rail_index].position,
+            segment_rails[rail_index-1].position)
+        local direction = best_direction(target_orientation)
         if not strain.cd[idx].d
         then
             direction = (direction + 4) % 8
@@ -309,6 +316,18 @@ local function spawn_train(stop, surface, strain, created_entities)
         local et = surface.create_entity(args)
         if et == nil then
             error("Could not create carriage " .. idx)
+        end
+        -- The spawning direction is finicky, so do not trust it being accurate
+        local actual_orientation = et.orientation
+        local error = math.abs((actual_orientation - target_orientation + 0.5)%1-0.5)
+        if error > 0.25 then
+            -- More than a quarter circle difference -> try the other direction
+            et.destroy()
+            args.direction = (args.direction + 4)%8
+            et = surface.create_entity(args)
+            if et == nil then
+                error("Could not create reverse carriage " .. idx)
+            end
         end
         table.insert(created_entities, et)
         -- Check against accidental merges. Previous teleport mod notes that
