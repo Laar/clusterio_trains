@@ -1,6 +1,7 @@
 import * as lib from "@clusterio/lib";
 import { BaseInstancePlugin, Instance } from "@clusterio/host";
-import { ClearenceResponse, InstanceDetails, InstanceDetailsListRequest, InstanceDetailsPatchEvent, TrainClearenceRequest, TrainIdRequest, TrainIdResponse, TrainTeleportRequest, TrainTeleportResponse } from "./messages";
+import  * as Msg from "./messages";
+import { InstanceDetails } from "./messages";
 import { Type, Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import { LuaPartial, fromLuaPartial, fromLuaNull } from "./util/luapartial";
@@ -77,12 +78,12 @@ export class InstancePlugin extends BaseInstancePlugin {
 			this.wrapEventFeedback(this.handleZoneUpdateIPC.bind(this)))
 
 		this.instance.server.handle("clustorio_trains_clearence", this.handleClearenceIPC.bind(this))
-		this.instance.handle(TrainClearenceRequest, this.handleClearenceRequest.bind(this))
+		this.instance.handle(Msg.TrainClearenceRequest, this.handleClearenceRequest.bind(this))
 		this.instance.server.handle("clusterio_trains_trainid", this.handleTrainIdIPC.bind(this))
 		this.instance.server.handle("clusterio_trains_teleport", this.handleTeleportIPC.bind(this))
-		this.instance.handle(TrainTeleportRequest, this.handleTeleportRequest.bind(this))
+		this.instance.handle(Msg.TrainTeleportRequest, this.handleTeleportRequest.bind(this))
 
-		this.instance.handle(InstanceDetailsPatchEvent, this.handleInstanceDetailsPatchEvent.bind(this))
+		this.instance.handle(Msg.InstanceDetailsPatchEvent, this.handleInstanceDetailsPatchEvent.bind(this))
 		this.instance.server.handle("clusterio_trains_instancedetails", this.handleInstanceDetailsIPC.bind(this))
 
 		if (this.uplinkAvailable === undefined) {
@@ -242,7 +243,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 	// Instance
 	async refreshInstancesDB() {
 		let instances : Array<InstanceDetails>
-			= await this.instance.sendTo("controller", new InstanceDetailsListRequest())
+			= await this.instance.sendTo("controller", new Msg.InstanceDetailsListRequest())
 		this.instanceDB.clear()
 		instances.forEach(instance => {
 			this.instanceDB.set(instance.id, instance)
@@ -253,7 +254,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		}
 	}
 
-	async handleInstanceDetailsPatchEvent(event: InstanceDetailsPatchEvent) {
+	async handleInstanceDetailsPatchEvent(event: Msg.InstanceDetailsPatchEvent) {
 		const patch = event.patch
 		const updateInstance = this.instanceDB.get(patch.id)
 		if (updateInstance === undefined) {
@@ -271,7 +272,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 			...event,
 			id: this.instance.id
 		}
-		this.instance.sendTo("controller", new InstanceDetailsPatchEvent(patch))
+		this.instance.sendTo("controller", new Msg.InstanceDetailsPatchEvent(patch))
 	}
 
 	async sendInstances() {	 
@@ -299,7 +300,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 				result: "Failure"
 			}
 		} else {
-			const request = new TrainClearenceRequest(
+			const request = new Msg.TrainClearenceRequest(
 				event.length,
 				event.id,
 				event.targetZone,
@@ -335,7 +336,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		}
 	}
 
-	async handleClearenceRequest(event: TrainClearenceRequest) : Promise<ClearenceResponse> {
+	async handleClearenceRequest(event: Msg.TrainClearenceRequest) : Promise<Msg.ClearenceResponse> {
 		if (!this.rconAvailable) {
 			return {
 				id: event.id,
@@ -354,7 +355,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 				result: "Failure",
 			}
 		}
-		if (Value.Check(ClearenceResponse, parsedResponse)) {
+		if (Value.Check(Msg.ClearenceResponse, parsedResponse)) {
 			this.logger.info('Sending valid response')
 			return parsedResponse;
 		} else {
@@ -369,8 +370,8 @@ export class InstancePlugin extends BaseInstancePlugin {
 	async handleTrainIdIPC(event: TrainIdIPC) {
 		if (this.uplinkAvailable) {
 			this.logger.info(`Requesting new global train id for train ${event.trainId}`)
-			const request = new TrainIdRequest(this.instance.id, event.trainId)
-			const idResponse: TrainIdResponse = await this.instance.sendTo("controller", request)
+			const request = new Msg.TrainIdRequest(this.instance.id, event.trainId)
+			const idResponse: Msg.TrainIdResponse = await this.instance.sendTo("controller", request)
 			this.logger.info(`Received global train id ${idResponse.id} for train ${event.trainId}`)
 			if (this.rconAvailable) {
 				const data = JSON.stringify(idResponse)
@@ -381,16 +382,16 @@ export class InstancePlugin extends BaseInstancePlugin {
 
 	// Teleport
 	async handleTeleportIPC(event: TeleportIPC) {
-		const request = new TrainTeleportRequest(event.trainId, event.instanceId, event.targetZone, event.train, event.station)
+		const request = new Msg.TrainTeleportRequest(event.trainId, event.instanceId, event.targetZone, event.train, event.station)
 		this.logger.info(`Teleporting train ${event.trainId} to instance ${event.instanceId} zone ${request.zone}`)
-		let response : TrainTeleportResponse
+		let response : Msg.TrainTeleportResponse
 		if (event.instanceId == this.instance.id) {
 			response = await this.handleTeleportRequest(request)
 		} else {
 			response = await this.instance.sendTo({"instanceId": event.instanceId}, request)
 		}
 	}
-	async handleTeleportRequest(request: TrainTeleportRequest) : Promise<TrainTeleportResponse> {
+	async handleTeleportRequest(request: Msg.TrainTeleportRequest) : Promise<Msg.TrainTeleportResponse> {
 		this.logger.info(`Received train ${request.trainId} for zone ${request.zone}`)
 		let data = JSON.stringify(request)
 		if (this.rconAvailable) {

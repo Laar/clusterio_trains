@@ -2,20 +2,11 @@ import * as lib from "@clusterio/lib";
 import { BaseControllerPlugin, InstanceInfo } from "@clusterio/controller";
 import { Static } from "@sinclair/typebox";
 
-import {
-	SimpleInstanceStatus,
-	InstanceDetails,
-	InstanceDetailsPatch,
-	InstanceDetailsListRequest,
-	InstanceDetailsPatchEvent,
-	TrainTeleportRequest,
-	TrainIdRequest,
-	TrainTeleportResponse,
-	TrainIdResponse,
-} from "./messages";
+import * as Msg from "./messages";
+import { InstanceDetails } from "./messages";
 import { InstanceStatus } from "@clusterio/lib";
 
-function reducedStatus(status: InstanceStatus) : SimpleInstanceStatus {
+function reducedStatus(status: InstanceStatus) : Msg.SimpleInstanceStatus {
 	switch(status) {
 		case "starting":
 			return "starting"
@@ -42,9 +33,9 @@ export class ControllerPlugin extends BaseControllerPlugin {
 	private trainsDB : Map<number, TrainRegistration> = new Map()
 
 	async init() {
-		this.controller.handle(InstanceDetailsPatchEvent, this.handleInstancePatchEvent.bind(this))
-		this.controller.handle(InstanceDetailsListRequest, this.handleInstanceDetailsListRequest.bind(this))
-		this.controller.handle(TrainIdRequest, this.handleTrainIdRequest.bind(this))
+		this.controller.handle(Msg.InstanceDetailsPatchEvent, this.handleInstancePatchEvent.bind(this))
+		this.controller.handle(Msg.InstanceDetailsListRequest, this.handleInstanceDetailsListRequest.bind(this))
+		this.controller.handle(Msg.TrainIdRequest, this.handleTrainIdRequest.bind(this))
 
 		this.controller.instances.forEach((val, id) => {
 			this.instanceDB.set(id, new InstanceDetails(id,
@@ -81,21 +72,21 @@ export class ControllerPlugin extends BaseControllerPlugin {
 		}
 	}
 
-	async handleInstancePatch(patch: InstanceDetailsPatch) {
+	async handleInstancePatch(patch: Msg.InstanceDetailsPatch) {
 		let instance = this.instanceDB.get(patch.id)
 		if (instance != null) {
 			instance.patch(patch)
-			this.controller.sendTo("allInstances", new InstanceDetailsPatchEvent(patch))
+			this.controller.sendTo("allInstances", new Msg.InstanceDetailsPatchEvent(patch))
 
 		} else {
 			this.logger.error(`Unknown instance with id: ${patch.id}`)
 		}
 	}
-	async handleInstancePatchEvent(event: InstanceDetailsPatchEvent) {
+	async handleInstancePatchEvent(event: Msg.InstanceDetailsPatchEvent) {
 		this.handleInstancePatch(event.patch);
 	}
 
-	async handleInstanceDetailsListRequest(event: InstanceDetailsListRequest) {
+	async handleInstanceDetailsListRequest(event: Msg.InstanceDetailsListRequest) {
 		let result : Array<InstanceDetails> = []
 		this.instanceDB.forEach((value, _) => {
 			result.push(value)
@@ -115,13 +106,13 @@ export class ControllerPlugin extends BaseControllerPlugin {
 		this.logger.info(`controller::onPlayerEvent ${instance.id} ${JSON.stringify(event)}`);
 	}
 
-	async handleTrainIdRequest(request : TrainIdRequest) : Promise<TrainIdResponse>{
+	async handleTrainIdRequest(request : Msg.TrainIdRequest) : Promise<Msg.TrainIdResponse>{
 		const nextId = Array.from(this.trainsDB.keys()).reduce((a, b) => a < b ? b : a, 0) + 1
 		this.trainsDB.set(nextId, {lastInstance: request.instance, localTrainId: request.trainId})
 		return {id: nextId, trainId: request.trainId}
 	}
 
-	async handleTeleportRequest(request: TrainTeleportRequest) : Promise<TrainTeleportResponse> {
+	async handleTeleportRequest(request: Msg.TrainTeleportRequest) : Promise<Msg.TrainTeleportResponse> {
 		const trainId = request.trainId
 		let registrion = this.trainsDB.get(trainId)
 		if (registrion === undefined) {
@@ -130,7 +121,7 @@ export class ControllerPlugin extends BaseControllerPlugin {
 			this.trainsDB.set(trainId, registrion)
 		}
 		registrion.lastInstance = request.instance
-		let response: TrainTeleportResponse
+		let response: Msg.TrainTeleportResponse
 			= await this.controller.sendTo({"instanceId": request.instance}, request)
 		return response
 	}
