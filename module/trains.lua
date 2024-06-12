@@ -48,6 +48,9 @@ local registered_trains
 --- @type fun(registration: StationRegistration) => nil
 local check_station
 
+--- @type fun(event: OnClearenceRCON)
+local on_clearence
+
 -- Init --
 ----------
 
@@ -182,10 +185,10 @@ local function send_clearence_request(train, registration)
     else
         game.print("Instance offline")
         -- TODO: This should not go via json (or rcon)
-        trains_api.rcon.on_clearence(game.table_to_json({
+        on_clearence({
             id = train.id,
             result = "Offline"
-        }))
+        })
     end
 end
 
@@ -302,7 +305,7 @@ end)
 
 local teleport_ipc = ipc.register_json_ipc("clusterio_trains_teleport", "TeleportIPC")
 
-ipc.register_rcon("on_clearence", "OnClearenceRCON", function(event)
+on_clearence = function(event)
     local trainId = event.id
     local result = event.result
     local queue = clearence_queue[trainId]
@@ -365,7 +368,9 @@ ipc.register_rcon("on_clearence", "OnClearenceRCON", function(event)
     for _, e in ipairs(train.carriages) do
         e.destroy()
     end
-end)
+end
+
+ipc.register_rcon("on_clearence", "OnClearenceRCON", on_clearence)
 
 ipc.register_rcon("on_teleport_receive", "OnTeleportReceiveRCON", function(event)
     local global_train_id = event.trainId
