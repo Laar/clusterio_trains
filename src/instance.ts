@@ -332,7 +332,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		if (event.dst.instance == this.instance.id) {
 			response = await this.handleTeleportRequest(request)
 		} else {
-			response = await this.instance.sendTo({"instanceId": event.dst.instance}, request)
+			response = await this.instance.sendTo("controller", request)
 		}
 	}
 	async handleTeleportRequest(request: Msg.TrainTeleportRequest) : Promise<Msg.TrainTeleportResponse> {

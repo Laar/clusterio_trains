@@ -35,6 +35,7 @@ export class ControllerPlugin extends BaseControllerPlugin {
 		this.controller.handle(Msg.InstanceDetailsPatchEvent, this.handleInstancePatchEvent.bind(this))
 		this.controller.handle(Msg.InstanceDetailsListRequest, this.handleInstanceDetailsListRequest.bind(this))
 		this.controller.handle(Msg.TrainIdRequest, this.handleTrainIdRequest.bind(this))
+		this.controller.handle(Msg.TrainTeleportRequest, this.handleTeleportRequest.bind(this))
 
 		this.controller.instances.forEach((val, id) => {
 			this.instanceDB.set(id, new InstanceDetails(id,
