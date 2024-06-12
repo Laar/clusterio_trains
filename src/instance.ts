@@ -334,15 +334,24 @@ export class InstancePlugin extends BaseInstancePlugin {
 		} else {
 			response = await this.instance.sendTo("controller", request)
 		}
+		await this.sendRcon(`/c clusterio_trains.rcon.on_departure_received("${lib.escapeString(JSON.stringify(response))}")`)
 	}
 	async handleTeleportRequest(request: Msg.TrainTeleportRequest) : Promise<Msg.TrainTeleportResponse> {
 		this.logger.info(`Received train ${request.trainId} for zone ${request.dst.zone}`)
 		let data = JSON.stringify(request)
 		if (this.rconAvailable) {
-			this.sendRcon(`/sc clusterio_trains.rcon.on_teleport_receive("${lib.escapeString(data)}")`)
+			await this.sendRcon(`/sc clusterio_trains.rcon.on_teleport_receive("${lib.escapeString(data)}")`)
+			// TODO: Better error handling
+			return {
+				trainId: request.trainId,
+				arrived: true
+			}
 		} else {
 			this.logger.warn('Discarded train as rcon was not available')
+			return {
+				trainId: request.trainId,
+				arrived: false
+			}
 		}
-		return {}
 	}
 }

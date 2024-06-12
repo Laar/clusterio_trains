@@ -28,6 +28,22 @@ local trains_api = {
 ---@field tick integer
 ---@field zone ZoneName
 
+--- @alias DepartureState "requested" | "prepared" | "sent" | "rejected"
+
+--- @class Departure Teleport in progress or rejected
+--- @field teleport PreparedTeleport
+--- @field state DepartureState
+--- @field tick integer Last attempt at teleporting
+
+--- @class PreparedTeleport
+--- @field trainId integer Global train id
+--- @field dst ZoneInstance
+--- @field src {zone: ZoneName}
+--- @field train SerializedTrain
+--- @field station string
+--- @field tick integer When was this train desconstructed
+--- @field length integer
+
 --- @class SpawnEntry
 --- @field teleport ReceivedTeleport
 --- @field tick integer Last attempt at spawning
@@ -48,6 +64,8 @@ local clearence_queue
 local spawn_queue
 ---@type{[integer]: integer} Mapping of train id to global train id
 local registered_trains
+--- @type{ [integer]: Departure } Mapping of global train id to Departure
+local departing_teleport
 
 --- @type fun(registration: StationRegistration) => nil
 local check_station
@@ -69,6 +87,9 @@ trains_api.init = function ()
     if not global.clusterio_trains.registerted_trains then
         global.clusterio_trains.registerted_trains = {}
     end
+    if not global.clusterio_trains.departing_teleport then
+        global.clusterio_trains.departing_teleport = {}
+    end
     --- @type [StationRegistration] | "everything" | nil
     global.clusterio_trains.train_rescan = "everything"
     trains_api.on_load()
@@ -78,6 +99,7 @@ function trains_api.on_load()
     clearence_queue = global.clusterio_trains.clearence_queue
     spawn_queue = global.clusterio_trains.spawn_queue
     registered_trains = global.clusterio_trains.registerted_trains
+    departing_teleport = global.clusterio_trains.departing_teleport
 end
 
 -- Teleporting --
@@ -198,6 +220,24 @@ local function send_clearence_request(train, registration)
     end
 end
 
+--- @param deparature Departure
+local function send_departure_clearence_request(deparature)
+    local instance = instance_api.get_instance(deparature.teleport.dst.instance)
+    if instance == nil or instance.status ~= "available" then
+        -- TODO: Better handling of instance == nil
+        deparature.tick = game.tick
+        return
+    end
+    clearence_ipc({
+        length = deparature.teleport.length,
+        id = deparature.teleport.trainId,
+        dst = deparature.teleport.dst,
+        targetStation = deparature.teleport.station
+    })
+    deparature.tick = game.tick
+    deparature.state = "requested"
+end
+
 trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
     -- Rescan
     local rescan = global.clusterio_trains.train_rescan
@@ -214,6 +254,17 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
         end
         global.clusterio_trains.train_rescan = nil
     end
+    if global.clusterio_trains.teleports_active then
+        for _, departure in pairs(departing_teleport) do
+            if departure.state =="requested" or departure.state == "sent" then
+                goto continue
+            end
+            if departure.tick - game.tick < TELEPORT_COOLDOWN_TICKS then goto continue end
+            send_departure_clearence_request(departure)
+            ::continue::
+        end
+    end
+
     -- Resend requests
     for trainId, request in pairs(clearence_queue) do
         if game.tick - request.tick >= TELEPORT_COOLDOWN_TICKS then
@@ -309,8 +360,32 @@ end)
 
 local teleport_ipc = ipc.register_json_ipc("clusterio_trains_teleport", "TeleportIPC")
 
+
+---@param train_id integer
+local function send_teleport(train_id)
+    local departure = departing_teleport[train_id]
+    if not departure then
+        log("Warning: trying to teleport non existent train")
+        return
+    end
+    local teleport = departure.teleport
+    teleport_ipc({
+        trainId = teleport.trainId,
+        dst = teleport.dst,
+        train = teleport.train,
+        station = teleport.station
+    })
+    departure.state = "sent"
+    departure.tick = game.tick
+end
+
 on_clearence = function(event)
     local trainId = event.id
+    if departing_teleport[trainId] then
+        send_teleport(trainId)
+        return
+    end
+
     local result = event.result
     local queue = clearence_queue[trainId]
     local global_train_id = registered_trains[trainId]
@@ -361,22 +436,44 @@ on_clearence = function(event)
     end
     -- Start actual teleport
     local strain = serialize.serialize_train(train)
-    teleport_ipc({
-        trainId = global_train_id,
-        dst = {
-            instance = link.instanceId,
-            zone = link.zoneName
-        },
-        train = strain,
-        station = target_station_name
-    })
+    local length = serialize.linear_train_position(train)
     clearence_queue[trainId] = nil
     for _, e in ipairs(train.carriages) do
         e.destroy()
     end
+    departing_teleport[global_train_id] = {
+        tick = game.tick,
+        state = "prepared",
+        teleport = {
+            trainId = global_train_id,
+            dst = {
+                instance = link.instanceId,
+                zone = link.zoneName
+            },
+            src = { zone = source_zone },
+            train = strain,
+            station = target_station_name,
+            tick = game.tick,
+            length = length
+        }
+    }
+    send_teleport(global_train_id)
 end
-
 ipc.register_rcon("on_clearence", "OnClearenceRCON", on_clearence)
+
+ipc.register_rcon("on_departure_received", "OnDepartureReceived", function (event)
+    local departure = departing_teleport[event.trainId]
+    if departure then
+        if event.arrived then
+            departing_teleport[event.trainId] = nil
+        else
+            departure.state = "rejected"
+            departure.tick = game.tick
+        end
+    else
+        log("Warning: Received departure for non registered train ".. event.trainId)
+    end
+end)
 
 ipc.register_rcon("on_teleport_receive", "OnTeleportReceiveRCON", function(event)
     local global_train_id = event.trainId

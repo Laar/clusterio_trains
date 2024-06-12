@@ -57,6 +57,9 @@ local clusterio_api = require("modules/clusterio/api")
 --- @field id number
 --- @field trainId number
 
+--- @class OnDepartureReceived
+--- @field trainId integer
+--- @field arrived boolean
 
 -----------------
 --- Interface ---

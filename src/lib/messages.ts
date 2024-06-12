@@ -189,7 +189,10 @@ export class TrainTeleportRequest {
 		)
 	}
 
-	static Response = plainJson(Type.Object({}))
+	static Response = plainJson(Type.Object({
+		trainId: Type.Number(),
+		arrived: Type.Boolean()
+	}))
 }
 
 export type TrainTeleportResponse 
