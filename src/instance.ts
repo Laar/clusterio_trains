@@ -1,72 +1,15 @@
 import * as lib from "@clusterio/lib";
 import { BaseInstancePlugin, Instance } from "@clusterio/host";
-import  * as Msg from "./messages";
-import { InstanceDetails } from "./messages";
-import { Type, Static } from "@sinclair/typebox";
+import  * as Msg from "./lib/messages";
+import { InstanceDetails } from "./lib/messages";
 import { Value } from "@sinclair/typebox/value";
-import { LuaPartial, fromLuaPartial, fromLuaNull } from "./util/luapartial";
+import { fromLuaPartial, fromLuaNull } from "./util/luapartial";
+import { ZoneDefinition, ZoneTarget, Region, UpdateType } from "./lib/types";
+import * as IPC from "./lib/ipc"
 
 export type ZoneConfig = Record<string, ZoneDefinition>;
 
-export type ZoneDefinition = {
-	// Name of the zone
-	name: string
-	// Linked target
-	link: ZoneTarget | null
-	// Region on the map
-	region: Region
-}
-
-export type ZoneTarget = {
-	instanceId: number
-	zoneName: string
-}
-
-export type Region = {
-	surface: string
-	x1: number
-	y1: number
-	x2: number
-	y2: number
-}
-
-enum UpdateType {
-	Add = "Add",
-	Update = "Update",
-	Delete = "Delete"
-}
-
-type ZoneUpdateIPC = {
-	z : LuaPartial<ZoneDefinition>,
-	t : UpdateType
-}
-
 class InputValidationError extends Error {};
-
-
-type ClearenceIPC = {
-	length: number
-	id: number
-	instanceId: number
-	targetZone: string
-	targetStation: string
-}
-
-type TeleportIPC = {
-	trainId: number
-	instanceId: number
-	targetZone: string
-	train: object
-	station: string
-}
-
-type InstanceDetailsIPC = {
-	stations? : string[]
-}
-
-type TrainIdIPC = {
-	trainId: number
-}
 
 export class InstancePlugin extends BaseInstancePlugin {
 	private instanceDB : Map<number, InstanceDetails> = new Map()
@@ -183,7 +126,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		}
 	}
 
-	async handleZoneUpdateIPC(event: ZoneUpdateIPC) {
+	async handleZoneUpdateIPC(event: IPC.ZoneUpdateIPC) {
 		const zones = this.instance.config.get("clusterio_trains.zones");
 		let newZones = {...zones};
 
@@ -267,7 +210,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 			}
 		}
 	}
-	async handleInstanceDetailsIPC(event: InstanceDetailsIPC) {
+	async handleInstanceDetailsIPC(event: IPC.InstanceDetailsIPC) {
 		let patch = {
 			...event,
 			id: this.instance.id
@@ -290,7 +233,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 	}
 
 	// Clearence
-	async handleClearenceIPC(event: ClearenceIPC) {
+	async handleClearenceIPC(event: IPC.ClearenceIPC) {
 		const instance = this.instanceDB.get(event.instanceId)
 		let response
 		if (instance === undefined) {
@@ -367,7 +310,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 		}
 	}
 	// Train registration
-	async handleTrainIdIPC(event: TrainIdIPC) {
+	async handleTrainIdIPC(event: IPC.TrainIdIPC) {
 		if (this.uplinkAvailable) {
 			this.logger.info(`Requesting new global train id for train ${event.trainId}`)
 			const request = new Msg.TrainIdRequest(this.instance.id, event.trainId)
@@ -381,7 +324,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 	}
 
 	// Teleport
-	async handleTeleportIPC(event: TeleportIPC) {
+	async handleTeleportIPC(event: IPC.TeleportIPC) {
 		const request = new Msg.TrainTeleportRequest(event.trainId, event.instanceId, event.targetZone, event.train, event.station)
 		this.logger.info(`Teleporting train ${event.trainId} to instance ${event.instanceId} zone ${request.zone}`)
 		let response : Msg.TrainTeleportResponse

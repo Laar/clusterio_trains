@@ -1,5 +1,5 @@
 import * as lib from "@clusterio/lib";
-import * as Messages from "./messages";
+import * as Messages from "./lib/messages";
 import { ZoneConfig } from "./instance";
 
 lib.definePermission({

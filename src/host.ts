@@ -1,6 +1,6 @@
 import * as lib from "@clusterio/lib";
 import { BaseHostPlugin } from "@clusterio/host";
-import { } from "./messages";
+import { } from "./lib/messages";
 
 export class HostPlugin extends BaseHostPlugin {
 	async init() {

@@ -1,9 +1,8 @@
 import * as lib from "@clusterio/lib";
 import { BaseControllerPlugin, InstanceInfo } from "@clusterio/controller";
-import { Static } from "@sinclair/typebox";
 
-import * as Msg from "./messages";
-import { InstanceDetails } from "./messages";
+import * as Msg from "./lib/messages";
+import { InstanceDetails } from "./lib/messages";
 import { InstanceStatus } from "@clusterio/lib";
 
 function reducedStatus(status: InstanceStatus) : Msg.SimpleInstanceStatus {
