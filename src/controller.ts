@@ -119,9 +119,9 @@ export class ControllerPlugin extends BaseControllerPlugin {
 			registrion = {lastInstance: -1, localTrainId: -1}
 			this.trainsDB.set(trainId, registrion)
 		}
-		registrion.lastInstance = request.instance
+		registrion.lastInstance = request.dst.instance
 		let response: Msg.TrainTeleportResponse
-			= await this.controller.sendTo({"instanceId": request.instance}, request)
+			= await this.controller.sendTo({"instanceId": request.dst.instance}, request)
 		return response
 	}
 } 

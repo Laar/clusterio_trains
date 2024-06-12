@@ -5,17 +5,14 @@ local clusterio_api = require("modules/clusterio/api")
 --- IPC types ---
 -----------------
 
-
 --- @class ClearenceIPC
 --- @field length number
---- @field instanceId InstanceId
---- @field targetZone ZoneName
+--- @field dst ZoneInstance
 --- @field targetStation string
 
 --- @class TeleportIPC
 --- @field trainId number
---- @field instanceId InstanceId
---- @field targetZone ZoneName
+--- @field dst ZoneInstance
 --- @field train SerializedTrain
 --- @field station string
 
@@ -43,7 +40,7 @@ local clusterio_api = require("modules/clusterio/api")
 --- @class ClearenceRequestRCON
 --- @field length number
 --- @field id number
---- @field zone ZoneName
+--- @field dst ZoneInstance
 --- @field station string
 
 --- @class OnClearenceRCON
@@ -52,8 +49,7 @@ local clusterio_api = require("modules/clusterio/api")
 
 --- @class OnTeleportReceiveRCON
 --- @field trainId integer
---- @field instance InstanceId
---- @field zone ZoneName
+--- @field dst ZoneInstance
 --- @field train SerializedTrain
 --- @field station string
 

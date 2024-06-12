@@ -9,15 +9,13 @@ export type ZoneUpdateIPC = {
 export type ClearenceIPC = {
 	length: number
 	id: number
-	instanceId: T.InstanceId
-	targetZone: T.ZoneName
+	dst: T.ZoneInstance
 	targetStation: string
 }
 
 export type TeleportIPC = {
 	trainId: T.GTrainId
-	instanceId: T.InstanceId
-	targetZone: T.ZoneName
+	dst: T.ZoneInstance
 	train: object
 	station: string
 }

@@ -234,7 +234,8 @@ export class InstancePlugin extends BaseInstancePlugin {
 
 	// Clearence
 	async handleClearenceIPC(event: IPC.ClearenceIPC) {
-		const instance = this.instanceDB.get(event.instanceId)
+		const dstInstanceId = event.dst.instance
+		const instance = this.instanceDB.get(event.dst.instance)
 		let response
 		if (instance === undefined) {
 			this.logger.error('Invalid target instance id')
@@ -246,10 +247,10 @@ export class InstancePlugin extends BaseInstancePlugin {
 			const request = new Msg.TrainClearenceRequest(
 				event.length,
 				event.id,
-				event.targetZone,
+				event.dst,
 				event.targetStation
 			)
-			if(event.instanceId == this.instance.id) {
+			if(dstInstanceId == this.instance.id) {
 				response = await this.handleClearenceRequest(request)
 			} else if(instance.status !== "available") {
 				response = {
@@ -257,7 +258,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 					response: "Offline"
 				}
 			} else {
-				response = await this.instance.sendTo({"instanceId" : event.instanceId}, request).catch(error=>{
+				response = await this.instance.sendTo({"instanceId" : dstInstanceId}, request).catch(error=>{
 					if (error instanceof lib.RequestError && error.message === 'Instance is not running.') {
 						return {
 							id: event.id,
@@ -325,17 +326,17 @@ export class InstancePlugin extends BaseInstancePlugin {
 
 	// Teleport
 	async handleTeleportIPC(event: IPC.TeleportIPC) {
-		const request = new Msg.TrainTeleportRequest(event.trainId, event.instanceId, event.targetZone, event.train, event.station)
-		this.logger.info(`Teleporting train ${event.trainId} to instance ${event.instanceId} zone ${request.zone}`)
+		const request = new Msg.TrainTeleportRequest(event.trainId, event.dst, event.train, event.station)
+		this.logger.info(`Teleporting train ${event.trainId} to instance ${event.dst.instance} zone ${request.dst.zone}`)
 		let response : Msg.TrainTeleportResponse
-		if (event.instanceId == this.instance.id) {
+		if (event.dst.instance == this.instance.id) {
 			response = await this.handleTeleportRequest(request)
 		} else {
-			response = await this.instance.sendTo({"instanceId": event.instanceId}, request)
+			response = await this.instance.sendTo({"instanceId": event.dst.instance}, request)
 		}
 	}
 	async handleTeleportRequest(request: Msg.TrainTeleportRequest) : Promise<Msg.TrainTeleportResponse> {
-		this.logger.info(`Received train ${request.trainId} for zone ${request.zone}`)
+		this.logger.info(`Received train ${request.trainId} for zone ${request.dst.zone}`)
 		let data = JSON.stringify(request)
 		if (this.rconAvailable) {
 			this.sendRcon(`/sc clusterio_trains.rcon.on_teleport_receive("${lib.escapeString(data)}")`)

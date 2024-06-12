@@ -1,5 +1,7 @@
 
 
+import { Type, Static } from "@sinclair/typebox";
+
 export type InstanceId = number
 /**
  * Teleport zone name
@@ -37,4 +39,10 @@ export enum UpdateType {
 	Update = "Update",
 	Delete = "Delete"
 }
+
+export const zoneInstanceSchema = Type.Object({
+    "zone" : Type.String(),
+    "instance": Type.Number()
+})
+export type ZoneInstance = Static<typeof zoneInstanceSchema>
 

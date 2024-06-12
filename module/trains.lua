@@ -177,8 +177,10 @@ local function send_clearence_request(train, registration)
         clearence_ipc({
             length = length,
             id = train.id,
-            instanceId = link.instanceId,
-            targetZone = link.zoneName,
+            dst = {
+                instance = link.instanceId,
+                zone = link.zoneName,
+            },
             -- TODO: The case where the next part is not a station
             targetStation = target_station(train) or ""
         })
@@ -260,7 +262,7 @@ end
 
 ipc.register_rcon("request_clearence", "ClearenceRequestRCON", function (event)
     local id = event.id
-    local zone_name = event.zone
+    local zone_name = event.dst.zone
     local length = event.length
     local target_station = event.station
 
@@ -300,6 +302,7 @@ ipc.register_rcon("request_clearence", "ClearenceRequestRCON", function (event)
 
     local jsonresponse = game.table_to_json(response)
     -- game.print({'', 'Responding with: ', jsonresponse})
+    -- TODO: Type this
     rcon.print(jsonresponse)
 end)
 
@@ -359,8 +362,10 @@ on_clearence = function(event)
     local strain = serialize.serialize_train(train)
     teleport_ipc({
         trainId = global_train_id,
-        instanceId = link.instanceId,
-        targetZone = link.zoneName,
+        dst = {
+            instance = link.instanceId,
+            zone = link.zoneName
+        },
         train = strain,
         station = target_station_name
     })
@@ -375,9 +380,9 @@ ipc.register_rcon("on_clearence", "OnClearenceRCON", on_clearence)
 ipc.register_rcon("on_teleport_receive", "OnTeleportReceiveRCON", function(event)
     local global_train_id = event.trainId
     local strain = event.train
-    local zone_name = event.zone
+    local zone_name = event.dst.zone
     local station = event.station
-    local zone = zones_api.lookup_zone(event.zone)
+    local zone = zones_api.lookup_zone(zone_name)
     -- Always insert,  just to be safe
     table.insert(spawn_queue, {
         global_train_id = global_train_id,

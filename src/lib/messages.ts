@@ -1,5 +1,6 @@
 import { plainJson, jsonArray, jsonPrimitive, StringEnum } from "@clusterio/lib";
 import { Type, Static } from "@sinclair/typebox";
+import { ZoneInstance, zoneInstanceSchema } from "./types";
 
 export const SimpleInstanceStatus = Type.Union([
 	Type.Literal("unavailable"),
@@ -140,19 +141,19 @@ export class TrainClearenceRequest {
 	constructor(
 		public readonly length: number,
 		public readonly id: number,
-		public readonly zone: string,
+		public readonly dst: ZoneInstance,
 		public readonly station: string
 	) {}
 
 	static jsonSchema = Type.Object({
 		length: Type.Number(),
 		id: Type.Number(),
-		zone: Type.String(),
+		dst: zoneInstanceSchema,
 		station: Type.String()
 	})
 
 	static fromJSON(json: Static<typeof TrainClearenceRequest.jsonSchema>) {
-		return new TrainClearenceRequest(json.length, json.id, json.zone, json.station)
+		return new TrainClearenceRequest(json.length, json.id, json.dst, json.station)
 	}
 
 	static Response = plainJson(ClearenceResponse)
@@ -167,16 +168,14 @@ export class TrainTeleportRequest {
 
 	constructor(
 		public readonly trainId: number,
-		public readonly instance: number,
-		public readonly zone: string,
+		public readonly dst: ZoneInstance,
 		public readonly train: object,
 		public readonly station: string
 	) {}
 
 	static jsonSchema = Type.Object({
 		trainId: Type.Number(),
-		instance: Type.Number(),
-		zone: Type.String(),
+		dst: zoneInstanceSchema,
 		train: Type.Object({}),
 		station: Type.String(),
 	})
@@ -184,8 +183,7 @@ export class TrainTeleportRequest {
 	static fromJSON(json: Static<typeof TrainTeleportRequest.jsonSchema>) {
 		return new TrainTeleportRequest(
 			json.trainId,
-			json.instance,
-			json.zone,
+			json.dst,
 			json.train,
 			json.station
 		)
