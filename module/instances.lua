@@ -7,23 +7,20 @@ local instanceApi = {
     defines = {},
 }
 
---- @alias instanceId integer
---- @alias instanceIdOrName instanceId | string
-
 --- @class GInstance
---- @field data {[instanceId]: InstanceData} Mapping id to associated data
---- @field names {[string]: instanceId} Mapping name to id
+--- @field data {[InstanceId]: InstanceData} Mapping id to associated data
+--- @field names {[string]: InstanceId} Mapping name to id
 
 --- @alias InstanceStatus "unavailable" | "starting" | "available"
 
 --- @class InstanceData
---- @field id instanceId
+--- @field id InstanceId
 --- @field status InstanceStatus
 --- @field name string
 --- @field stations string[]
 
 --- @class InstanceDataPatch
---- @field id instanceId
+--- @field id InstanceId
 --- @field name string?
 --- @field status InstanceStatus?
 --- @field stations string[]
@@ -59,7 +56,7 @@ function instanceApi.on_load()
 end
 
 ---Find instance by id or name
----@param idOrName instanceIdOrName or name of the instance
+---@param idOrName InstanceIdOrName
 ---@return InstanceData? instance_data
 local function get_instance_data(idOrName)
     local id
@@ -78,7 +75,7 @@ function instanceApi.get_all_instances()
 end
 
 --- Is an instance available
----@param idOrName instanceIdOrName
+---@param idOrName InstanceIdOrName
 ---@return boolean? available
 function instanceApi.available(idOrName)
     local inst = get_instance_data(idOrName)
@@ -86,7 +83,7 @@ function instanceApi.available(idOrName)
 end
 
 ---@param name string name of the instance
----@return instanceId?
+---@return InstanceId?
 function instanceApi.id_by_name(name)
     return ginstance.names[name]
 end

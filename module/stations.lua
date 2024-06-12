@@ -1,4 +1,4 @@
-local clusterio_api = require("modules/clusterio/api")
+local ipc = require("modules/clusterio_trains/types/ipc")
 local zones_api = require("modules/clusterio_trains/zones")
 local util = require("util")
 
@@ -7,17 +7,11 @@ local stations_api = {
 }
 
 ---@class StationRegistration
----@field zone zone_name Name of the zone
+---@field zone ZoneName Name of the zone
 ---@field entity LuaEntity_TrainStop The train stop entity
 ---@field length number Size of the track associated with the train stop
 ---@field egress boolean Whether to use it as an egress from this server
 ---@field ingress boolean Whether to use it as an ingress to this server
-
--- Override of LuaEntity when it is a TrainStop
---- @class LuaEntity_TrainStop: LuaEntity
---- @field unit_number integer
---- @field backer_name string
-
 
 local connection_directions = {
     defines.rail_connection_direction.left,
@@ -42,7 +36,7 @@ stations_api.defines.on_station_registration_refresh = script.generate_event_nam
 
 ---Create a staiton registration
 ---@param station LuaEntity_TrainStop
----@param zone_name zone_name
+---@param zone_name ZoneName
 ---@return StationRegistration
 local function create_registration(station, zone_name)
     local crail = station.connected_rail
@@ -96,6 +90,8 @@ local stations_global
 -- Export --
 ------------
 
+local instancedetails_ipc = ipc.register_json_ipc("clusterio_trains_instancedetails", "InstanceDetailsIPC")
+
 local function export_stations()
     local name_index = {}
     for unit_number, entity in pairs(stations_global.all_stations) do
@@ -109,7 +105,7 @@ local function export_stations()
     for name, _ in pairs(name_index) do
         names[#names+1] = name
     end
-    clusterio_api.send_json("clusterio_trains_instancedetails", {
+    instancedetails_ipc({
         stations = names
     })
 end
@@ -190,7 +186,7 @@ function stations_api.lookup_station(entity)
 end
 
 --- Lookup a station in a specific zone
---- @param zone_name zone_name
+--- @param zone_name ZoneName
 --- @return LuaEntity_TrainStop?
 function stations_api.find_station_in_zone(zone_name)
     ensure_valid_stations()
@@ -203,7 +199,7 @@ function stations_api.find_station_in_zone(zone_name)
 end
 
 ---Lookup stations in teleporting zones
----@param query {zone?:zone_name, length?: number, ingress?: boolean, egress?: boolean, name?: string}
+---@param query {zone?:ZoneName, length?: number, ingress?: boolean, egress?: boolean, name?: string}
 ---@return [StationRegistration]
 function stations_api.find_stations(query)
     ensure_valid_stations()
@@ -238,7 +234,7 @@ local function ripairs(t)
     return iter, t, #t + 1
 end
 
---- @alias StationQuery {zone?:zone_name, length?: number, ingress?: boolean, egress?: boolean, name?: string}
+--- @alias StationQuery {zone?:ZoneName, length?: number, ingress?: boolean, egress?: boolean, name?: string}
 ---@param queries [StationQuery] Multiple station queries
 ---@return [ [StationRegistration] ] result List of stations matching a query and all subsequent queries
 function stations_api.find_best_stations(queries)

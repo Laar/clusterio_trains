@@ -5,11 +5,9 @@ local zones_api = {
 	rcon = {},
 	defines = {},
 }
-
---- @alias zone_name string
 ---
 --- @class Zone
---- @field name zone_name
+--- @field name ZoneName
 --- @field region Region
 --- @field link Link?
 ---
@@ -21,13 +19,13 @@ local zones_api = {
 --- @field y2 number
 ---
 --- @class Link
---- @field instanceId instanceId
---- @field zoneName zone_name
+--- @field instanceId InstanceId
+--- @field zoneName ZoneName
 
 -- TODO: Surface rename event?
 
 --- @class EventData.CT.ZoneChanged
---- @field name zone_name
+--- @field name ZoneName
 --- @field old Zone
 
 zones_api.defines.on_zone_changed = script.generate_event_name()
@@ -53,7 +51,7 @@ function zones_api.init()
 	zones_api.on_load()
 end
 
----@type {[zone_name]: Zone}
+---@type {[ZoneName]: Zone}
 local zonesglobal
 function zones_api.on_load()
 	zonesglobal = global.clusterio_trains.zones
@@ -107,7 +105,7 @@ end
 --- Set all zones
 --- @param zone_data string
 function zones_api.rcon.sync_all(zone_data)
-	---@type {[zone_name]: Zone}
+	---@type {[ZoneName]: Zone}
 	---@diagnostic disable-next-line: assign-type-mismatch
     local zone_table = game.json_to_table(zone_data)
 	local zone_count = 0
@@ -125,7 +123,7 @@ function zones_api.rcon.sync_all(zone_data)
 end
 
 ---Sync the data for a single zone
----@param name zone_name
+---@param name ZoneName
 ---@param zone_data string?
 function zones_api.rcon.sync(name, zone_data)
 	local old_zone = zonesglobal[name]
@@ -210,7 +208,7 @@ end
 ---Find a zone for a given position
 ---@param surface LuaSurface
 ---@param position {x: number, y:number}
----@return zone_name?
+---@return ZoneName?
 function zones_api.find_zone(surface, position)
 	local x = position.x
 	local y = position.y
@@ -228,7 +226,7 @@ function zones_api.find_zone(surface, position)
 end
 
 ---Find zone by name
----@param name zone_name
+---@param name ZoneName
 ---@return Zone?
 function zones_api.lookup_zone(name)
 	return zonesglobal[name]

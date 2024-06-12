@@ -1,4 +1,4 @@
-local clusterio_api = require("modules/clusterio/api")
+local ipc = require("modules/clusterio_trains/types/ipc")
 local instance_api = require("modules/clusterio_trains/instances")
 local stations_api = require("modules/clusterio_trains/stations")
 local zones_api = require("modules/clusterio_trains/zones")
@@ -27,7 +27,7 @@ local trains_api = {
 ---@class ClearenceEntry
 ---@field train LuaTrain
 ---@field tick integer
----@field zone zone_name
+---@field zone ZoneName
 
 ---@class ClearenceResponse
 ---@field id integer
@@ -35,7 +35,7 @@ local trains_api = {
 
 ---@class SpawnEntry
 ---@field global_train_id number
----@field zone_name zone_name
+---@field zone_name ZoneName
 ---@field strain SerializedTrain
 ---@field tick integer
 ---@field station string
@@ -83,7 +83,7 @@ end
 
 ---@param strain SerializedTrain
 ---@param surface string Name of the surface of the strain stop
----@param zone_name zone_name
+---@param zone_name ZoneName
 ---@param station string Station where to create the train
 ---@param global_train_id number Global train id of the new train
 ---@return boolean # Whether succesful
@@ -130,10 +130,12 @@ local function target_station(train)
     return next_record.station
 end
 
+local request_train_id_ipc = ipc.register_json_ipc("clusterio_trains_trainid", "TrainIdIPC")
+
 ---@param train LuaTrain
 local function request_train_id(train)
     if not train or not train.valid then return end
-    clusterio_api.send_json("clusterio_trains_trainid", {trainId = train.id})
+    request_train_id_ipc({trainId = train.id})
 end
 
 function trains_api.rcon.on_train_id(event_data)
@@ -144,6 +146,8 @@ function trains_api.rcon.on_train_id(event_data)
     if not train or not train.valid then return end
     registered_trains[event.trainId] = event.id
 end
+
+local clearence_ipc = ipc.register_json_ipc("clustorio_trains_clearence", "ClearenceIPC")
 
 ---@param train LuaTrain
 ---@param registration StationRegistration
@@ -175,7 +179,7 @@ local function send_clearence_request(train, registration)
 
     local instance = instance_api.get_instance(link.instanceId)
     if (instance ~= nil and instance.status == "available") then
-        clusterio_api.send_json('clustorio_trains_clearence', {
+        clearence_ipc({
             length = length,
             id = train.id,
             instanceId = link.instanceId,
@@ -307,6 +311,8 @@ trains_api.rcon.request_clearence = function (event_data)
     rcon.print(jsonresponse)
 end
 
+local teleport_ipc = ipc.register_json_ipc("clusterio_trains_teleport", "TeleportIPC")
+
 trains_api.rcon.on_clearence = function (event_data)
     ---@type ClearenceResponse
     ---@diagnostic disable-next-line: assign-type-mismatch
@@ -362,7 +368,7 @@ trains_api.rcon.on_clearence = function (event_data)
     end
     -- Start actual teleport
     local strain = serialize.serialize_train(train)
-    clusterio_api.send_json("clusterio_trains_teleport", {
+    teleport_ipc({
         trainId = global_train_id,
         instanceId = link.instanceId,
         targetZone = link.zoneName,
@@ -376,7 +382,7 @@ trains_api.rcon.on_clearence = function (event_data)
 end
 
 trains_api.rcon.on_teleport_receive = function (event_data)
-    ---@type {trainId: number, instance: instanceId, zone: zone_name, train: SerializedTrain, station: string}
+    ---@type {trainId: number, instance: InstanceId, zone: ZoneName, train: SerializedTrain, station: string}
     ---@diagnostic disable-next-line: assign-type-mismatch
     local event = game.json_to_table(event_data)
     local global_train_id = event.trainId

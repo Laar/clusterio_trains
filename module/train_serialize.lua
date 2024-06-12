@@ -3,9 +3,6 @@ local serialize = require("modules/clusterio/serialize")
 -- Types --
 -----------
 
----@class LuaEntity_RollingStock: LuaEntity
----@field train LuaTrain
-
 ---@class SerializedTrain
 ---@field t [string] Carriage prototype names
 ---@field cd [SerializedWagon] Wagon information
