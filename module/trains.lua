@@ -28,12 +28,16 @@ local trains_api = {
 ---@field tick integer
 ---@field zone ZoneName
 
----@class SpawnEntry
----@field global_train_id number
----@field zone_name ZoneName
----@field strain SerializedTrain
----@field tick integer
----@field station string
+--- @class SpawnEntry
+--- @field teleport ReceivedTeleport
+--- @field tick integer Last attempt at spawning
+
+--- @class ReceivedTeleport
+--- @field trainId integer Global train id
+--- @field dst ZoneInstance
+--- @field src {zone: ZoneName}
+--- @field train SerializedTrain
+--- @field station string
 
 -- Globals --
 -------------
@@ -79,24 +83,24 @@ end
 -- Teleporting --
 -----------------
 
----@param strain SerializedTrain
----@param surface string Name of the surface of the strain stop
----@param zone_name ZoneName
----@param station string Station where to create the train
----@param global_train_id number Global train id of the new train
----@return boolean # Whether succesful
----@nodiscard
-local function create_train(strain, surface, zone_name, station, global_train_id)
+--- @param teleport ReceivedTeleport
+--- @return boolean # Whether succesful
+--- @nodiscard
+local function create_train(teleport)
+    local strain = teleport.train
+    local zone_name = teleport.dst.zone
+    local station_name = teleport.station
+    local global_train_id = teleport.trainId
     -- Tries to create a serialized train in a given zone
     -- returns a success boolean
     local length = serialize.linear_train_position(strain.t)
-    local stations = stations_api.find_stations({zone=zone_name,ingress=true,length=length, name=station})
+    local stations = stations_api.find_stations({zone=zone_name,ingress=true,length=length, name=station_name})
     local new_train_carriages = {}
     local result_train = nil
     for _, station in pairs(stations) do
         local target_train_stop = station.entity
         local success = xpcall(function ()
-            serialize.spawn_train(target_train_stop, surface, strain, new_train_carriages)
+            serialize.spawn_train(target_train_stop, strain, new_train_carriages)
             if #new_train_carriages ~= #strain.t then
                 error("Incorrect number of entities")
             end
@@ -233,27 +237,24 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
         ::continue::
     end
     -- Spawn
+    --- @type SpawnEntry[]
     local updated_spawn_queue = {}
     for _, pending in ipairs(spawn_queue) do
-        local strain = pending.strain
-        local zone_name = pending.zone_name
-        local station_name = pending.station
-        local global_train_id = pending.global_train_id
         if game.tick - pending.tick > TELEPORT_COOLDOWN_TICKS
         then
-            local zone = zones_api.lookup_zone(zone_name)
-            if zone ~= nil and create_train(strain, zone.region.surface, zone_name, station_name, global_train_id)
+            if create_train(pending.teleport)
             then
                 -- Nothing to do, will remove it from the queue
             else
-                table.insert(updated_spawn_queue, {
-                    zone_name = zone_name,
-                    strain = strain,
+                --- @type SpawnEntry
+                local updatedEntry = {
+                    teleport = pending.teleport,
                     tick = game.tick
-                })
+                }
+                updated_spawn_queue[#updated_spawn_queue+1] = updatedEntry
             end
         else
-            table.insert(updated_spawn_queue, pending)
+            updated_spawn_queue[#updated_spawn_queue+1] = pending
         end
     end
     global.clusterio_trains.spawn_queue = updated_spawn_queue
@@ -384,18 +385,23 @@ ipc.register_rcon("on_teleport_receive", "OnTeleportReceiveRCON", function(event
     local station = event.station
     local zone = zones_api.lookup_zone(zone_name)
     -- Always insert,  just to be safe
-    table.insert(spawn_queue, {
-        global_train_id = global_train_id,
-        zone_name = zone_name,
-        strain = strain,
-        tick = game.tick,
+    --- @type ReceivedTeleport
+    local stored_teleport = {
+        trainId = global_train_id,
+        train = strain,
+        dst = event.dst,
+        src = {zone = ""}, -- TODO
         station = station
-    })
+    }
+    spawn_queue[#spawn_queue+1] = {
+        teleport = stored_teleport,
+        tick = game.tick
+    }
     if zone == nil then
         game.print({'', 'Warning received train for unknown zone ', zone_name})
         return
     end
-    if create_train(strain, zone.region.surface, zone_name, station, global_train_id) then
+    if create_train(stored_teleport) then
         spawn_queue[#spawn_queue] = nil
     end
 end)

@@ -259,10 +259,9 @@ end
 
 ---Spawn train carriages
 ---@param stop LuaEntity_TrainStop
----@param surface string # Surface of the trainstop entity
 ---@param strain SerializedTrain
 ---@param created_entities [LuaEntity]
-local function spawn_train(stop, surface, strain, created_entities)
+local function spawn_train(stop, strain, created_entities)
     local total_length, carriage_positions = linear_train_position(strain.t)
     local crail = stop.connected_rail
     if crail == nil then error("Station without connected rail") end
@@ -273,9 +272,7 @@ local function spawn_train(stop, surface, strain, created_entities)
         error('Rail segment (' .. segment_length .. 'too short for train of length ' .. total_length)
     end
     local segment_rails = crail.get_rail_segment_rails(rail_dir)
-    -- TODO: Take from the trainstop registration
-    local surface = game.get_surface('nauvis')
-    if surface == nil then error('Invalid surface') end
+    local surface = stop.surface
     local rail_index = 1
     local rail_length = 0
     local rail_distance = 0
