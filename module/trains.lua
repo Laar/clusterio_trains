@@ -18,7 +18,6 @@ TELEPORT_COOLDOWN_TICKS = 120
 local trains_api = {
     events = {},
     on_nth_tick = {},
-    rcon = {},
 }
 
 -- Types --
@@ -28,10 +27,6 @@ local trains_api = {
 ---@field train LuaTrain
 ---@field tick integer
 ---@field zone ZoneName
-
----@class ClearenceResponse
----@field id integer
----@field result string
 
 ---@class SpawnEntry
 ---@field global_train_id number
@@ -138,14 +133,11 @@ local function request_train_id(train)
     request_train_id_ipc({trainId = train.id})
 end
 
-function trains_api.rcon.on_train_id(event_data)
-    --- @type {id: number, trainId: number}
-    ---@diagnostic disable-next-line: assign-type-mismatch
-    local event = game.json_to_table(event_data)
+ipc.register_rcon("on_train_id", "OnTrainIdRCON", function (event)
     local train = game.get_train_by_id(event.trainId)
     if not train or not train.valid then return end
     registered_trains[event.trainId] = event.id
-end
+end)
 
 local clearence_ipc = ipc.register_json_ipc("clustorio_trains_clearence", "ClearenceIPC")
 
@@ -263,10 +255,7 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
     spawn_queue = global.clusterio_trains.spawn_queue
 end
 
-trains_api.rcon.request_clearence = function (event_data)
-    ---@type { length: integer, id: integer, zone: string, station: string}
-    ---@diagnostic disable-next-line: assign-type-mismatch
-    local event = game.json_to_table(event_data)
+ipc.register_rcon("request_clearence", "ClearenceRequestRCON", function (event)
     local id = event.id
     local zone_name = event.zone
     local length = event.length
@@ -309,14 +298,11 @@ trains_api.rcon.request_clearence = function (event_data)
     local jsonresponse = game.table_to_json(response)
     -- game.print({'', 'Responding with: ', jsonresponse})
     rcon.print(jsonresponse)
-end
+end)
 
 local teleport_ipc = ipc.register_json_ipc("clusterio_trains_teleport", "TeleportIPC")
 
-trains_api.rcon.on_clearence = function (event_data)
-    ---@type ClearenceResponse
-    ---@diagnostic disable-next-line: assign-type-mismatch
-    local event = game.json_to_table(event_data)
+ipc.register_rcon("on_clearence", "OnClearenceRCON", function(event)
     local trainId = event.id
     local result = event.result
     local queue = clearence_queue[trainId]
@@ -350,8 +336,8 @@ trains_api.rcon.on_clearence = function (event_data)
         -- Teleporting disabled
         return
     end
-    local target_station = target_station(train)
-    if not target_station then return end
+    local target_station_name = target_station(train)
+    if not target_station_name then return end
     if result ~= 'Ready' then
         user_feedback.show_train_clearence_feedback(queue.train, event)
         return
@@ -373,18 +359,15 @@ trains_api.rcon.on_clearence = function (event_data)
         instanceId = link.instanceId,
         targetZone = link.zoneName,
         train = strain,
-        station = target_station
+        station = target_station_name
     })
     clearence_queue[trainId] = nil
     for _, e in ipairs(train.carriages) do
         e.destroy()
     end
-end
+end)
 
-trains_api.rcon.on_teleport_receive = function (event_data)
-    ---@type {trainId: number, instance: InstanceId, zone: ZoneName, train: SerializedTrain, station: string}
-    ---@diagnostic disable-next-line: assign-type-mismatch
-    local event = game.json_to_table(event_data)
+ipc.register_rcon("on_teleport_receive", "OnTeleportReceiveRCON", function(event)
     local global_train_id = event.trainId
     local strain = event.train
     local zone_name = event.zone
@@ -405,7 +388,7 @@ trains_api.rcon.on_teleport_receive = function (event_data)
     if create_train(strain, zone.region.surface, zone_name, station, global_train_id) then
         spawn_queue[#spawn_queue] = nil
     end
-end
+end)
 
 ---Check a station for a stopped train and put it in the teleport queue if needed
 ---@param registration StationRegistration

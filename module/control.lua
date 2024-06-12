@@ -1,4 +1,5 @@
 local clusterio_api = require("modules/clusterio/api")
+local ipc = require("modules/clusterio_trains/types/ipc")
 local instance_api = require("modules/clusterio_trains/instances")
 local zones_api = require("modules/clusterio_trains/zones")
 local stations_api = require("modules/clusterio_trains/stations")
@@ -8,7 +9,7 @@ local gui = require("modules/clusterio_trains/gui")
 local clusterio_trains = {
 	events = {},
 	on_nth_tick = {},
-	rcon = {},
+	rcon = ipc.rcon_handlers,
 }
 
 
@@ -33,26 +34,9 @@ local merge_events = function (apis)
 	end
 	return events
 end
-
-local merge_rcon = function (tables)
-	local result = {}
-	for _, tab in ipairs(tables) do
-		if tab.rcon then
-			for key, handler in pairs(tab.rcon) do
-				if (result[key]) then
-					error('Duplicate rcon function ' .. key)
-				end
-				result[key] = handler
-			end
-		end
-	end
-	return result
-end
-
 clusterio_trains.events = merge_events({stations_api, trains_api, gui})
 clusterio_trains.on_nth_tick = trains_api.on_nth_tick
 
-clusterio_trains.rcon = merge_rcon({instance_api, zones_api, trains_api})
 
 clusterio_trains.zones = {
 	add = zones_api.add,

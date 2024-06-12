@@ -1,9 +1,9 @@
 -- Module goal: Storage of instance related information
 
 util = require("util")
+ipc = require("modules/clusterio_trains/types/ipc")
 
 local instanceApi = {
-    rcon = {},
     defines = {},
 }
 
@@ -17,12 +17,6 @@ local instanceApi = {
 --- @field id InstanceId
 --- @field status InstanceStatus
 --- @field name string
---- @field stations string[]
-
---- @class InstanceDataPatch
---- @field id InstanceId
---- @field name string?
---- @field status InstanceStatus?
 --- @field stations string[]
 
 ---@type GInstance
@@ -91,10 +85,9 @@ end
 -- RCON --
 ----------
 
-function instanceApi.rcon.set_instances(instance_data)
-    ---@type {[integer]: InstanceData}
-	---@diagnostic disable-next-line: assign-type-mismatch
-	local instance_table = game.json_to_table(instance_data)
+
+---@param instance_table InstanceListRCON
+local function set_instances(instance_table)
     -- Clear before aliasing and overwriting
     ginstance.data = {}
     ginstance.names = {}
@@ -111,15 +104,12 @@ function instanceApi.rcon.set_instances(instance_data)
         data[inst.id] = inst
         names[inst.name] = inst.id
     end
-    -- TODO: Event
     script.raise_event(instanceApi.defines.on_instance_data_reload, {})
 end
+ipc.register_rcon("set_instances", "InstanceListRCON", set_instances)
 
-function instanceApi.rcon.set_instance(event_data)
-    ---@type InstanceDataPatch
-	---@diagnostic disable-next-line: assign-type-mismatch
-	local event = game.json_to_table(event_data)
-	local current = ginstance.data[event.id]
+ipc.register_rcon("set_instance", "InstanceDataPatch", function (event)
+    local current = ginstance.data[event.id]
     local inst = {
         id = event.id,
         name = event.name or current.name,
@@ -141,6 +131,6 @@ function instanceApi.rcon.set_instance(event_data)
     if (not util.table.compare(inst.stations, current.stations)) then
         script.raise_event(instanceApi.defines.on_stations_changed, {})
     end
-end
+end)
 
 return instanceApi

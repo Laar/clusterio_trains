@@ -1,8 +1,8 @@
 local clusterio_api = require("modules/clusterio/api")
+local ipc = require("modules/clusterio_trains/types/ipc")
 local instance_api = require("modules/clusterio_trains/instances")
 
 local zones_api = {
-	rcon = {},
 	defines = {},
 }
 ---
@@ -103,11 +103,8 @@ local function debug_draw()
 end
 
 --- Set all zones
---- @param zone_data string
-function zones_api.rcon.sync_all(zone_data)
-	---@type {[ZoneName]: Zone}
-	---@diagnostic disable-next-line: assign-type-mismatch
-    local zone_table = game.json_to_table(zone_data)
+--- @param zone_table AllZonesRCON
+function sync_all_rcon(zone_table)
 	local zone_count = 0
 	for zone_name, zone in pairs(zone_table) do
 		zone_count = zone_count + 1
@@ -121,11 +118,11 @@ function zones_api.rcon.sync_all(zone_data)
 	debug_draw();
 	script.raise_event(zones_api.defines.on_zones_reload, {})
 end
+ipc.register_rcon("sync_all", "AllZonesRCON", sync_all_rcon)
 
----Sync the data for a single zone
 ---@param name ZoneName
 ---@param zone_data string?
-function zones_api.rcon.sync(name, zone_data)
+ipc.register_untyped_rcon("sync", function (name, zone_data)
 	local old_zone = zonesglobal[name]
     if (zone_data)
 	then
@@ -140,7 +137,7 @@ function zones_api.rcon.sync(name, zone_data)
 	end
 	debug_draw();
 	script.raise_event(zones_api.defines.on_zone_changed, {name = name, old=old_zone})
-end
+end)
 
 function zones_api.add(name, x1, y1, x2, y2, surface)
     -- local surface = surface or game.player.surface.name or ''

@@ -7,7 +7,7 @@ local user_feedback = {}
 
 ---comment
 ---@param train LuaTrain
----@param clearence_response ClearenceResponse
+---@param clearence_response OnClearenceRCON
 function user_feedback.show_train_clearence_feedback(train, clearence_response)
     ---@type LuaEntity
     local target_entity
