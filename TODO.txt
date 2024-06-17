@@ -2,10 +2,10 @@
 Bigger items to do:
 [x] Checking if the spawn of the train is valid
 [x] Error handling during spawning
-[ ] Proper handling of offline instances
+[x] Proper handling of offline instances
     [x] During sending of preclearence
     [x] Preclearence
-    [ ] Spawn
+    [x] Spawn
 [x] Checking on clearence if the train is going to fit
 [x] Handling of the in/out stations
 [x] Stations do not need to have rail attached and attached rail can change
@@ -28,9 +28,15 @@ Bigger items to do:
   [ ] Ingress names and egress names should be different in the same zone
   [ ] Station names should exist in max 1 zone
 [ ] Safety of teleports against dropping trains
+  [x] Offline instance
+  [ ] Lua Script errors during teleport sequence
+  [ ] TS Script errors during teleport sequence
+  [ ] Loading an old autosave
 [ ] Nicer local module structure
   [x] Separate rcon interface
-
+[ ] Feedback for trains waiting to teleport when teleprint disabled
+[ ] Improved typing of the typescript rcon interface
+[ ] Couple the javascript & lua types for ipc/rcon interfaces
 
 Notes:
  - Schedule entries can be temporary, even trainstops
