@@ -102,7 +102,7 @@ export class ControllerPlugin extends BaseControllerPlugin {
 
 	async handleTrainIdRequest(request : Msg.TrainIdRequest) : Promise<Msg.TrainIdResponse>{
 		const registration = this.trainsDB.register(request)
-		return {id: registration.id, trainId: request.trainId}
+		return {id: registration.id, ref: request.ref}
 	}
 
 	async handleTeleportRequest(request: Msg.TrainTeleportRequest) : Promise<Msg.TrainTeleportResponse> {

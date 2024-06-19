@@ -216,20 +216,25 @@ export class TrainIdRequest {
 
 	constructor(
 		public readonly instance: number,
-		public readonly trainId: number,
+		public readonly ref: number,
+		public readonly trainLId: number,
 		public readonly tick: number
 	) {}
 
 	static jsonSchema = Type.Object({
 		instance: Type.Number(), 
-		trainId: Type.Number(),
+		ref: Type.Number(),
+		trainLId: Type.Integer(),
 		tick: Type.Number()
 	})
 	static fromJSON(json: Static<typeof TrainIdRequest.jsonSchema>) {
-		return new TrainIdRequest(json.instance, json.trainId, json.tick)
+		return new TrainIdRequest(json.instance, json.ref, json.trainLId, json.tick)
 	}
 
-	static Response = plainJson(Type.Object({id : Type.Number(), trainId: Type.Number()}))
+	static Response = plainJson(Type.Object({
+		id : Type.Number(), 
+		ref: Type.Number()
+	}))
 }
 
 export type TrainIdResponse

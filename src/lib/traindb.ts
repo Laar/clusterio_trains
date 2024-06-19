@@ -81,7 +81,7 @@ export class TrainDB {
             history: [{
                 instance: msg.instance,
                 tick: msg.tick,
-                trainId: msg.trainId
+                trainId: msg.trainLId
             }]
         }
         this.trains.set(id, registration)

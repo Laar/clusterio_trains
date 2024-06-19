@@ -161,13 +161,13 @@ local request_train_id_ipc = ipc.register_json_ipc("clusterio_trains_trainid", "
 ---@param train LuaTrain
 local function request_train_id(train)
     if not train or not train.valid then return end
-    request_train_id_ipc({trainId = train.id, tick = game.tick})
+    request_train_id_ipc({ref = train.id, tick = game.tick, trainLId = train.id})
 end
 
 ipc.register_rcon("on_train_id", "OnTrainIdRCON", function (event)
-    local train = game.get_train_by_id(event.trainId)
+    local train = game.get_train_by_id(event.ref)
     if not train or not train.valid then return end
-    registered_trains[event.trainId] = event.id
+    registered_trains[event.ref] = event.id
 end)
 
 local clearence_ipc = ipc.register_json_ipc("clustorio_trains_clearence", "ClearenceIPC")

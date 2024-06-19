@@ -27,7 +27,8 @@ export type InstanceDetailsIPC = {
 }
 
 export type TrainIdIPC = {
-	trainId: number
+	ref: number
+	trainLId: number,
 	tick: number
 }
 

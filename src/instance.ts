@@ -313,10 +313,10 @@ export class InstancePlugin extends BaseInstancePlugin {
 	// Train registration
 	async handleTrainIdIPC(event: IPC.TrainIdIPC) {
 		if (this.uplinkAvailable) {
-			this.logger.info(`Requesting new global train id for train ${event.trainId}`)
-			const request = new Msg.TrainIdRequest(this.instance.id, event.trainId, event.tick)
+			this.logger.info(`Requesting new global train id for train ${event.trainLId}`)
+			const request = new Msg.TrainIdRequest(this.instance.id, event.ref, event.trainLId, event.tick)
 			const idResponse: Msg.TrainIdResponse = await this.instance.sendTo("controller", request)
-			this.logger.info(`Received global train id ${idResponse.id} for train ${event.trainId}`)
+			this.logger.info(`Received global train id ${idResponse.id} for train ${event.trainLId}`)
 			if (this.rconAvailable) {
 				const data = JSON.stringify(idResponse)
 				await this.sendRcon(`/c clusterio_trains.rcon.on_train_id("${lib.escapeString(data)}")`)
