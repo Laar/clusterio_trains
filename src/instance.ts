@@ -314,7 +314,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 	async handleTrainIdIPC(event: IPC.TrainIdIPC) {
 		if (this.uplinkAvailable) {
 			this.logger.info(`Requesting new global train id for train ${event.trainId}`)
-			const request = new Msg.TrainIdRequest(this.instance.id, event.trainId)
+			const request = new Msg.TrainIdRequest(this.instance.id, event.trainId, event.tick)
 			const idResponse: Msg.TrainIdResponse = await this.instance.sendTo("controller", request)
 			this.logger.info(`Received global train id ${idResponse.id} for train ${event.trainId}`)
 			if (this.rconAvailable) {
@@ -326,7 +326,8 @@ export class InstancePlugin extends BaseInstancePlugin {
 
 	// Teleport
 	async handleTeleportIPC(event: IPC.TeleportIPC) {
-		const request = new Msg.TrainTeleportRequest(event.trainId, event.dst, event.train, event.station)
+		const request = new Msg.TrainTeleportRequest(event.trainId, event.dst,
+			{instance: this.instance.id, zone: event.src.zone}, event.tick, event.train, event.station)
 		this.logger.info(`Teleporting train ${event.trainId} to instance ${event.dst.instance} zone ${request.dst.zone}`)
 		let response : Msg.TrainTeleportResponse
 		if (event.dst.instance == this.instance.id) {
@@ -334,23 +335,30 @@ export class InstancePlugin extends BaseInstancePlugin {
 		} else {
 			response = await this.instance.sendTo("controller", request)
 		}
-		await this.sendRcon(`/c clusterio_trains.rcon.on_departure_received("${lib.escapeString(JSON.stringify(response))}")`)
+		await this.sendRcon(`/sc clusterio_trains.rcon.on_departure_received("${lib.escapeString(JSON.stringify(response))}")`)
 	}
 	async handleTeleportRequest(request: Msg.TrainTeleportRequest) : Promise<Msg.TrainTeleportResponse> {
 		this.logger.info(`Received train ${request.trainId} for zone ${request.dst.zone}`)
 		let data = JSON.stringify(request)
 		if (this.rconAvailable) {
-			await this.sendRcon(`/sc clusterio_trains.rcon.on_teleport_receive("${lib.escapeString(data)}")`)
-			// TODO: Better error handling
-			return {
-				trainId: request.trainId,
-				arrived: true
+			let response = await this.sendRcon(`/sc clusterio_trains.rcon.on_teleport_receive("${lib.escapeString(data)}")`)
+			let parsedResponse: IPC.TeleportReceivedRCON
+			try {
+				parsedResponse = JSON.parse(response)
+				return {
+					trainId: request.trainId,
+					arrival: parsedResponse
+				}
+			} catch(e) {
+				// TODO: Is this the best response?
+				return {
+					trainId: request.trainId
+				}
 			}
 		} else {
 			this.logger.warn('Discarded train as rcon was not available')
 			return {
 				trainId: request.trainId,
-				arrived: false
 			}
 		}
 	}

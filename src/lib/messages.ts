@@ -169,6 +169,8 @@ export class TrainTeleportRequest {
 	constructor(
 		public readonly trainId: number,
 		public readonly dst: ZoneInstance,
+		public readonly src: ZoneInstance,
+		public readonly tick: number,
 		public readonly train: object,
 		public readonly station: string
 	) {}
@@ -176,6 +178,8 @@ export class TrainTeleportRequest {
 	static jsonSchema = Type.Object({
 		trainId: Type.Number(),
 		dst: zoneInstanceSchema,
+		src: zoneInstanceSchema,
+		tick: Type.Number(),
 		train: Type.Object({}),
 		station: Type.String(),
 	})
@@ -184,6 +188,8 @@ export class TrainTeleportRequest {
 		return new TrainTeleportRequest(
 			json.trainId,
 			json.dst,
+			json.src,
+			json.tick,
 			json.train,
 			json.station
 		)
@@ -191,7 +197,10 @@ export class TrainTeleportRequest {
 
 	static Response = plainJson(Type.Object({
 		trainId: Type.Number(),
-		arrived: Type.Boolean()
+		arrival: Type.Optional(Type.Object({
+			tick: Type.Number(),
+			trainId: Type.Optional(Type.Number())
+		}))
 	}))
 }
 
@@ -207,12 +216,17 @@ export class TrainIdRequest {
 
 	constructor(
 		public readonly instance: number,
-		public readonly trainId: number
+		public readonly trainId: number,
+		public readonly tick: number
 	) {}
 
-	static jsonSchema = Type.Object({instance: Type.Number(), trainId: Type.Number()})
+	static jsonSchema = Type.Object({
+		instance: Type.Number(), 
+		trainId: Type.Number(),
+		tick: Type.Number()
+	})
 	static fromJSON(json: Static<typeof TrainIdRequest.jsonSchema>) {
-		return new TrainIdRequest(json.instance, json.trainId)
+		return new TrainIdRequest(json.instance, json.trainId, json.tick)
 	}
 
 	static Response = plainJson(Type.Object({id : Type.Number(), trainId: Type.Number()}))

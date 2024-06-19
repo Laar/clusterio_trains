@@ -106,7 +106,7 @@ end
 -----------------
 
 --- @param teleport ReceivedTeleport
---- @return boolean # Whether succesful
+--- @return LuaTrain? # Created train when succesful
 --- @nodiscard
 local function create_train(teleport)
     local strain = teleport.train
@@ -117,7 +117,9 @@ local function create_train(teleport)
     -- returns a success boolean
     local length = serialize.linear_train_position(strain.t)
     local stations = stations_api.find_stations({zone=zone_name,ingress=true,length=length, name=station_name})
+    --- @type LuaEntity_RollingStock[]
     local new_train_carriages = {}
+    --- @type LuaTrain?
     local result_train = nil
     for _, station in pairs(stations) do
         local target_train_stop = station.entity
@@ -139,10 +141,10 @@ local function create_train(teleport)
             end
         end)
         if success then
-            return true
+            return result_train
         end
     end
-    return false
+    return nil
 end
 
 ---Finds the next station name in the schedule
@@ -159,7 +161,7 @@ local request_train_id_ipc = ipc.register_json_ipc("clusterio_trains_trainid", "
 ---@param train LuaTrain
 local function request_train_id(train)
     if not train or not train.valid then return end
-    request_train_id_ipc({trainId = train.id})
+    request_train_id_ipc({trainId = train.id, tick = game.tick})
 end
 
 ipc.register_rcon("on_train_id", "OnTrainIdRCON", function (event)
@@ -372,6 +374,8 @@ local function send_teleport(train_id)
     teleport_ipc({
         trainId = teleport.trainId,
         dst = teleport.dst,
+        src = { zone = teleport.src.zone },
+        tick = game.tick,
         train = teleport.train,
         station = teleport.station
     })
@@ -464,7 +468,7 @@ ipc.register_rcon("on_clearence", "OnClearenceRCON", on_clearence)
 ipc.register_rcon("on_departure_received", "OnDepartureReceived", function (event)
     local departure = departing_teleport[event.trainId]
     if departure then
-        if event.arrived then
+        if event.arrival then
             departing_teleport[event.trainId] = nil
         else
             departure.state = "rejected"
@@ -498,9 +502,17 @@ ipc.register_rcon("on_teleport_receive", "OnTeleportReceiveRCON", function(event
         game.print({'', 'Warning received train for unknown zone ', zone_name})
         return
     end
-    if create_train(stored_teleport) then
+    local train = create_train(stored_teleport)
+    if train then
         spawn_queue[#spawn_queue] = nil
     end
+    --- @type TeleportReceivedRCON
+    local result = {
+        tick = game.tick,
+        trainId = train and train.id
+    }
+    -- TODO: Abstract this
+    rcon.print(game.table_to_json(result))
 end)
 
 ---Check a station for a stopped train and put it in the teleport queue if needed

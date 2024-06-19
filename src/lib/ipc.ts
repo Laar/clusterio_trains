@@ -15,7 +15,9 @@ export type ClearenceIPC = {
 
 export type TeleportIPC = {
 	trainId: T.GTrainId
+	src: {zone: T.ZoneName}
 	dst: T.ZoneInstance
+	tick: number,
 	train: object
 	station: string
 }
@@ -26,5 +28,11 @@ export type InstanceDetailsIPC = {
 
 export type TrainIdIPC = {
 	trainId: number
+	tick: number
+}
+
+export type TeleportReceivedRCON = {
+	trainId?: number,
+	tick: number
 }
 

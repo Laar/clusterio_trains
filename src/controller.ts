@@ -3,6 +3,7 @@ import { BaseControllerPlugin, InstanceInfo } from "@clusterio/controller";
 
 import * as Msg from "./lib/messages";
 import { InstanceDetails } from "./lib/messages";
+import { TrainDB } from "./lib/traindb";
 import { InstanceStatus } from "@clusterio/lib";
 
 function reducedStatus(status: InstanceStatus) : Msg.SimpleInstanceStatus {
@@ -22,20 +23,17 @@ function reducedStatus(status: InstanceStatus) : Msg.SimpleInstanceStatus {
 	}
 }
 
-type TrainRegistration = {
-	lastInstance: number,
-	localTrainId: number | null
-}
-
 export class ControllerPlugin extends BaseControllerPlugin {
 	private instanceDB : Map<number, InstanceDetails> = new Map()
-	private trainsDB : Map<number, TrainRegistration> = new Map()
+	private trainsDB! : TrainDB
 
 	async init() {
 		this.controller.handle(Msg.InstanceDetailsPatchEvent, this.handleInstancePatchEvent.bind(this))
 		this.controller.handle(Msg.InstanceDetailsListRequest, this.handleInstanceDetailsListRequest.bind(this))
 		this.controller.handle(Msg.TrainIdRequest, this.handleTrainIdRequest.bind(this))
 		this.controller.handle(Msg.TrainTeleportRequest, this.handleTeleportRequest.bind(this))
+
+		this.trainsDB = await TrainDB.load(this.controller.config.get('controller.database_directory'), this.logger)
 
 		this.controller.instances.forEach((val, id) => {
 			this.instanceDB.set(id, new InstanceDetails(id,
@@ -95,7 +93,7 @@ export class ControllerPlugin extends BaseControllerPlugin {
 	}
 
 	async onSaveData() {
-		this.logger.info("controller::onSaveData");
+		this.trainsDB.save(this.controller.config.get('controller.database_directory'))
 	}
 
 	async onShutdown() {
@@ -107,22 +105,16 @@ export class ControllerPlugin extends BaseControllerPlugin {
 	}
 
 	async handleTrainIdRequest(request : Msg.TrainIdRequest) : Promise<Msg.TrainIdResponse>{
-		const nextId = Array.from(this.trainsDB.keys()).reduce((a, b) => a < b ? b : a, 0) + 1
-		this.trainsDB.set(nextId, {lastInstance: request.instance, localTrainId: request.trainId})
-		return {id: nextId, trainId: request.trainId}
+		const registration = this.trainsDB.register(request)
+		return {id: registration.id, trainId: request.trainId}
 	}
 
 	async handleTeleportRequest(request: Msg.TrainTeleportRequest) : Promise<Msg.TrainTeleportResponse> {
-		const trainId = request.trainId
-		let registrion = this.trainsDB.get(trainId)
-		if (registrion === undefined) {
-			this.logger.warn(`Teleporting unknown train ${request.trainId}`)
-			registrion = {lastInstance: -1, localTrainId: -1}
-			this.trainsDB.set(trainId, registrion)
-		}
-		registrion.lastInstance = request.dst.instance
+		this.trainsDB.handleTeleportStart(request)
+		// TODO: Check target is actually online
 		let response: Msg.TrainTeleportResponse
 			= await this.controller.sendTo({"instanceId": request.dst.instance}, request)
+		this.trainsDB.handleTeleportFinished(response)
 		return response
 	}
 } 
