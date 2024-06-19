@@ -84,8 +84,8 @@ trains_api.init = function ()
     if not global.clusterio_trains.spawn_queue then
         global.clusterio_trains.spawn_queue = {}
     end
-    if not global.clusterio_trains.registerted_trains then
-        global.clusterio_trains.registerted_trains = {}
+    if not global.clusterio_trains.registered_trains then
+        global.clusterio_trains.registered_trains = {}
     end
     if not global.clusterio_trains.departing_teleport then
         global.clusterio_trains.departing_teleport = {}
@@ -98,7 +98,7 @@ end
 function trains_api.on_load()
     clearence_queue = global.clusterio_trains.clearence_queue
     spawn_queue = global.clusterio_trains.spawn_queue
-    registered_trains = global.clusterio_trains.registerted_trains
+    registered_trains = global.clusterio_trains.registered_trains
     departing_teleport = global.clusterio_trains.departing_teleport
 end
 
