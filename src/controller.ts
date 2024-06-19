@@ -100,10 +100,6 @@ export class ControllerPlugin extends BaseControllerPlugin {
 		this.logger.info("controller::onShutdown");
 	}
 
-	async onPlayerEvent(instance: InstanceInfo, event: lib.PlayerEvent) {
-		this.logger.info(`controller::onPlayerEvent ${instance.id} ${JSON.stringify(event)}`);
-	}
-
 	async handleTrainIdRequest(request : Msg.TrainIdRequest) : Promise<Msg.TrainIdResponse>{
 		const registration = this.trainsDB.register(request)
 		return {id: registration.id, trainId: request.trainId}
