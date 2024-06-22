@@ -17,6 +17,7 @@ local clusterio_api = require("modules/clusterio/api")
 --- @field tick number
 --- @field train SerializedTrain
 --- @field station string
+--- @field historyId integer
 
 --- @class InstanceDetailsIPC
 --- @field stations? string[]
@@ -56,10 +57,12 @@ local clusterio_api = require("modules/clusterio/api")
 --- @field dst ZoneInstance
 --- @field train SerializedTrain
 --- @field station string
+--- @field historyId number
 
 --- @class OnTrainIdRCON
 --- @field id number
 --- @field ref number
+--- @field historyId integer
 
 --- @class TeleportReceivedRCON
 --- @field tick number

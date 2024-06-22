@@ -55,6 +55,11 @@ local trains_api = {
 --- @field train SerializedTrain
 --- @field station string
 
+--- @class GTrainMeta
+--- @field trainId integer Global TrainId
+--- @field trainLId integer? Local train id (if spawned)
+--- @field historyId integer Entry in the cluster history
+
 -- Globals --
 -------------
 
@@ -66,6 +71,8 @@ local spawn_queue
 local registered_trains
 --- @type{ [integer]: Departure } Mapping of global train id to Departure
 local departing_teleport
+--- @type {[integer]: GTrainMeta} Global meta data for each cluster train on this instance
+local global_trains
 
 --- @type fun(registration: StationRegistration) => nil
 local check_station
@@ -87,6 +94,9 @@ trains_api.init = function ()
     if not global.clusterio_trains.registered_trains then
         global.clusterio_trains.registered_trains = {}
     end
+    if not global.clusterio_trains.global_trains then
+        global.clusterio_trains.global_trains = {}
+    end
     if not global.clusterio_trains.departing_teleport then
         global.clusterio_trains.departing_teleport = {}
     end
@@ -100,6 +110,7 @@ function trains_api.on_load()
     spawn_queue = global.clusterio_trains.spawn_queue
     registered_trains = global.clusterio_trains.registered_trains
     departing_teleport = global.clusterio_trains.departing_teleport
+    global_trains = global.clusterio_trains.global_trains
 end
 
 -- Teleporting --
@@ -134,6 +145,7 @@ local function create_train(teleport)
                 result_train.go_to_station(result_train.schedule.current)
             end
             registered_trains[result_train.id] = global_train_id
+            global_trains[global_train_id].trainLId = result_train.id
         end, function (error_msg)
             log(error_msg)
             for _, e in ipairs(new_train_carriages) do
@@ -168,6 +180,11 @@ ipc.register_rcon("on_train_id", "OnTrainIdRCON", function (event)
     local train = game.get_train_by_id(event.ref)
     if not train or not train.valid then return end
     registered_trains[event.ref] = event.id
+    global_trains[event.id] = {
+        trainId = event.id,
+        trainLId = train.id,
+        historyId = event.historyId,
+    }
 end)
 
 local clearence_ipc = ipc.register_json_ipc("clustorio_trains_clearence", "ClearenceIPC")
@@ -297,7 +314,7 @@ trains_api.on_nth_tick[TELEPORT_WORK_INTERVAL] = function ()
         then
             if create_train(pending.teleport)
             then
-                -- Nothing to do, will remove it from the queue
+                -- Nothing to do
             else
                 --- @type SpawnEntry
                 local updatedEntry = {
@@ -371,13 +388,15 @@ local function send_teleport(train_id)
         return
     end
     local teleport = departure.teleport
+    local gtrain = global_trains[teleport.trainId]
     teleport_ipc({
         trainId = teleport.trainId,
         dst = teleport.dst,
         src = { zone = teleport.src.zone },
         tick = game.tick,
         train = teleport.train,
-        station = teleport.station
+        station = teleport.station,
+        historyId = gtrain and gtrain.historyId or -1
     })
     departure.state = "sent"
     departure.tick = game.tick
@@ -442,6 +461,7 @@ on_clearence = function(event)
     local strain = serialize.serialize_train(train)
     local length = serialize.linear_train_position(train)
     clearence_queue[trainId] = nil
+    global_trains[global_train_id].trainLId = nil
     for _, e in ipairs(train.carriages) do
         e.destroy()
     end
@@ -470,6 +490,7 @@ ipc.register_rcon("on_departure_received", "OnDepartureReceived", function (even
     if departure then
         if event.arrival then
             departing_teleport[event.trainId] = nil
+            global_trains[event.trainId] = nil
         else
             departure.state = "rejected"
             departure.tick = game.tick
@@ -493,6 +514,10 @@ ipc.register_rcon("on_teleport_receive", "OnTeleportReceiveRCON", function(event
         dst = event.dst,
         src = {zone = ""}, -- TODO
         station = station
+    }
+    global_trains[global_train_id] = {
+        trainId = global_train_id,
+        historyId = event.historyId + 1,
     }
     spawn_queue[#spawn_queue+1] = {
         teleport = stored_teleport,
@@ -567,6 +592,11 @@ trains_api.events[defines.events.on_train_changed_state] = function (event)
         -- Nothing to do
         -- game.print({'', 'Wrong state'})
     end
+end
+
+--- @param event EventData.on_train_schedule_changed
+trains_api.events[defines.events.on_train_schedule_changed] = function (event)
+    game.print({'', 'Schedule changed: ', event.train, ' ', game.table_to_json(event.train.schedule)})
 end
 
 return trains_api

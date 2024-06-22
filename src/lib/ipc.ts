@@ -17,9 +17,10 @@ export type TeleportIPC = {
 	trainId: T.GTrainId
 	src: {zone: T.ZoneName}
 	dst: T.ZoneInstance
-	tick: number,
+	tick: number
 	train: object
 	station: string
+	historyId: number
 }
 
 export type InstanceDetailsIPC = {

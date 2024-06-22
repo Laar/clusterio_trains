@@ -327,7 +327,7 @@ export class InstancePlugin extends BaseInstancePlugin {
 	// Teleport
 	async handleTeleportIPC(event: IPC.TeleportIPC) {
 		const request = new Msg.TrainTeleportRequest(event.trainId, event.dst,
-			{instance: this.instance.id, zone: event.src.zone}, event.tick, event.train, event.station)
+			{instance: this.instance.id, zone: event.src.zone}, event.tick, event.train, event.station, event.historyId)
 		this.logger.info(`Teleporting train ${event.trainId} to instance ${event.dst.instance} zone ${request.dst.zone}`)
 		let response : Msg.TrainTeleportResponse
 		if (event.dst.instance == this.instance.id) {

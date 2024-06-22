@@ -8,6 +8,7 @@ import * as Msg from "./messages";
 
 
 export type TrainLocation = {
+    readonly historyId: number
     readonly instance: InstanceId
     readonly tick: number
     readonly trainId?: number,
@@ -79,6 +80,7 @@ export class TrainDB {
         let registration = {
             id: id,
             history: [{
+                historyId: 0,
                 instance: msg.instance,
                 tick: msg.tick,
                 trainId: msg.trainLId
@@ -90,28 +92,28 @@ export class TrainDB {
 
     public handleTeleportStart(msg: Msg.TrainTeleportRequest) {
         let registration = this.trains.get(msg.trainId)
+        let historyId = msg.historyId
         if (registration === undefined) {
             this.logger.warn(`Teleporting unknown train ${msg.trainId}`)
             registration = {
                 id: msg.trainId,
-                history: [{
-                    instance: msg.src.instance,
-                    tick: msg.tick,
-                }]
+                history: []
             }
             this.trains.set(msg.trainId, registration)
         }
-        if (registration.teleport) {
-            // TODO: Do something
-        }
-        let current = registration.history.at(-1)
+        let current = registration.history.at(historyId)
         if (current === undefined || current.instance !== msg.src.instance) {
-            // Fix history
+            // Fix history by inserting a new entry
             current = {
+                historyId: historyId,
                 instance: msg.src.instance,
                 tick: msg.tick
             }
-            registration.history.push(current)
+            registration.history[historyId] = current
+        }
+        // TODO: Check if it has already teleported
+        if (registration.teleport) {
+            // TODO: Do something
         }
         current.exitTick = msg.tick
         current.exitZone = msg.src.zone
@@ -120,16 +122,16 @@ export class TrainDB {
         }
     }
 
-    public handleTeleportFinished(msg: Msg.TrainTeleportResponse) {
+    public handleTeleportFinished(msg: Msg.TrainTeleportResponse, historyId: number) {
         let registration = this.trains.get(msg.trainId)
         if (registration === undefined) {
             this.logger.warn(`Teleported unknown train ${msg.trainId}`)
             // TODO: Add registration
             throw new Error()
         }
-        let current = registration.history.at(-1)
+        let current = registration.history.at(historyId)
         if(current === undefined) {
-            this.logger.warn(`No history`)
+            this.logger.warn(`Incomplete history`)
         }
         if (registration.teleport === undefined) {
             // TODO: Do something   
@@ -137,13 +139,14 @@ export class TrainDB {
             let arrival = msg.arrival
             if(arrival !== undefined) {
                 let historyItem: TeleportLocation = {
+                    historyId: historyId + 1,
                     instance: registration.teleport.dst.instance,
                     tick: arrival.tick,
                     entryZone: registration.teleport.dst.zone,
                     entryTick: arrival.tick,
                     ... (arrival.trainId !== undefined ? {trainId: arrival.trainId} : {})
                 }
-                registration.history.push(historyItem)
+                registration.history[historyId + 1] = historyItem
             }
             // Delete pending teleport whether received or not
             delete registration.teleport

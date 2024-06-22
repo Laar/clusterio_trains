@@ -102,7 +102,7 @@ export class ControllerPlugin extends BaseControllerPlugin {
 
 	async handleTrainIdRequest(request : Msg.TrainIdRequest) : Promise<Msg.TrainIdResponse>{
 		const registration = this.trainsDB.register(request)
-		return {id: registration.id, ref: request.ref}
+		return {id: registration.id, ref: request.ref, historyId: registration.history.at(-1)!.historyId}
 	}
 
 	async handleTeleportRequest(request: Msg.TrainTeleportRequest) : Promise<Msg.TrainTeleportResponse> {
@@ -110,7 +110,7 @@ export class ControllerPlugin extends BaseControllerPlugin {
 		// TODO: Check target is actually online
 		let response: Msg.TrainTeleportResponse
 			= await this.controller.sendTo({"instanceId": request.dst.instance}, request)
-		this.trainsDB.handleTeleportFinished(response)
+		this.trainsDB.handleTeleportFinished(response, request.historyId)
 		return response
 	}
 } 

@@ -172,7 +172,8 @@ export class TrainTeleportRequest {
 		public readonly src: ZoneInstance,
 		public readonly tick: number,
 		public readonly train: object,
-		public readonly station: string
+		public readonly station: string,
+		public readonly historyId: number,
 	) {}
 
 	static jsonSchema = Type.Object({
@@ -182,6 +183,7 @@ export class TrainTeleportRequest {
 		tick: Type.Number(),
 		train: Type.Object({}),
 		station: Type.String(),
+		historyId: Type.Number(),
 	})
 
 	static fromJSON(json: Static<typeof TrainTeleportRequest.jsonSchema>) {
@@ -191,7 +193,8 @@ export class TrainTeleportRequest {
 			json.src,
 			json.tick,
 			json.train,
-			json.station
+			json.station,
+			json.historyId,
 		)
 	}
 
@@ -233,7 +236,8 @@ export class TrainIdRequest {
 
 	static Response = plainJson(Type.Object({
 		id : Type.Number(), 
-		ref: Type.Number()
+		ref: Type.Number(),
+		historyId: Type.Integer(),
 	}))
 }
 
