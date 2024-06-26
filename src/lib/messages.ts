@@ -1,6 +1,6 @@
 import { plainJson, jsonArray, jsonPrimitive, StringEnum } from "@clusterio/lib";
 import { Type, Static } from "@sinclair/typebox";
-import { ZoneInstance, zoneInstanceSchema } from "./types";
+import { InstanceZoneDetails, ZoneInstance, zoneInstanceSchema } from "./types";
 
 export const SimpleInstanceStatus = Type.Union([
 	Type.Literal("unavailable"),
@@ -8,29 +8,34 @@ export const SimpleInstanceStatus = Type.Union([
 	Type.Literal("available")])
 export type SimpleInstanceStatus = Static<typeof SimpleInstanceStatus>
 
+
 export class InstanceDetails {
 	public readonly id: number
 	private _name: string
 	private _status: SimpleInstanceStatus
 	private _stations: string[]
+	private _zones: InstanceZoneDetails[]
 
-	constructor(id: number, name: string, status: InstanceDetails["_status"], stations: string[]) {
+	constructor(id: number, name: string, status: InstanceDetails["_status"], stations: string[], zones: InstanceZoneDetails[]) {
 		this.id = id
 		this._name = name
 		this._status = status
 		this._stations = stations
+		this._zones = zones
 	}
 
 	get name() {return this._name}
 	get status() { return this._status }
 	get stations() { return this._stations }
+	get zones() { return this._zones}
 
 
 	static jsonSchema = Type.Object({
 		"id": Type.Number(),
 		"name": Type.String(),
 		"status": SimpleInstanceStatus,
-		"stations": Type.Array(Type.String())
+		"stations": Type.Array(Type.String()),
+		"zones": Type.Array(InstanceZoneDetails),
 	})
 
 	static fromJSON(json: Static<typeof InstanceDetails.jsonSchema>) {
@@ -38,7 +43,9 @@ export class InstanceDetails {
 			json.id,
 			json.name,
 			json.status,
-			json.stations)
+			json.stations,
+			json.zones,
+		)
 	}
 
 	toJSON() {
@@ -47,6 +54,7 @@ export class InstanceDetails {
 			name: this.name,
 			status: this.status,
 			stations: this.stations,
+			zones: this.zones
 		}
 	}
 
@@ -55,6 +63,7 @@ export class InstanceDetails {
 		if(update.name !== undefined) this._name = update.name
 		if(update.status !== undefined) this._status = update.status
 		if(update.stations !== undefined) this._stations = update.stations
+		if(update.zones !== undefined) this._zones = update.zones
 	}
 }
 
@@ -63,7 +72,8 @@ export const InstanceDetailsPatch = Type.Object({
 	"id": Type.Number(),
 	"name": Type.Optional(Type.String()),
 	"status": Type.Optional(SimpleInstanceStatus),
-	"stations": Type.Optional(Type.Array(Type.String()))
+	"stations": Type.Optional(Type.Array(Type.String())),
+	"zones": Type.Optional(Type.Array(InstanceZoneDetails)),
 })
 export type InstanceDetailsPatch = Static<typeof InstanceDetailsPatch>
 

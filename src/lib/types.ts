@@ -46,3 +46,10 @@ export const zoneInstanceSchema = Type.Object({
 })
 export type ZoneInstance = Static<typeof zoneInstanceSchema>
 
+export const InstanceZoneDetails = Type.Object({
+	name: Type.String(),
+	target: zoneInstanceSchema,
+	egress: Type.Optional(Type.Array(Type.String())),
+	ingress: Type.Optional(Type.Array(Type.String()))
+})
+export type InstanceZoneDetails = Static<typeof InstanceZoneDetails>

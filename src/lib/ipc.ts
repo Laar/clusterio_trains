@@ -25,6 +25,7 @@ export type TeleportIPC = {
 
 export type InstanceDetailsIPC = {
 	stations? : string[]
+	zones? : T.InstanceZoneDetails[]
 }
 
 export type TrainIdIPC = {

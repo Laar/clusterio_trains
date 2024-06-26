@@ -18,9 +18,16 @@ local instanceApi = {
 --- @field status InstanceStatus
 --- @field name string
 --- @field stations string[]
+--- @field zones InstanceZoneInfo[]
+
+--- @class InstanceZoneInfo
+--- @field name ZoneName
+--- @field target ZoneInstance?
+--- @field egress string[]?
+--- @field ingress string[]?
 
 ---@type GInstance
-local ginstance
+local giqnstance
 
 -- Event names --
 
@@ -100,6 +107,7 @@ local function set_instances(instance_table)
             name = instance.name,
             status = instance.status,
             stations = instance.stations,
+            zones = instance.zones,
         }
         data[inst.id] = inst
         names[inst.name] = inst.id
@@ -115,6 +123,7 @@ ipc.register_rcon("set_instance", "InstanceDataPatch", function (event)
         name = event.name or current.name,
         status = event.status or current.status,
         stations = event.stations or current.stations,
+        zones = event.zones or current.zones,
     }
     ginstance.data[event.id] = inst
     if current and event.name and (current.name ~= inst.name) then

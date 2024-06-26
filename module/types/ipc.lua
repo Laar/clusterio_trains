@@ -21,6 +21,7 @@ local clusterio_api = require("modules/clusterio/api")
 
 --- @class InstanceDetailsIPC
 --- @field stations? string[]
+--- @field zones? InstanceZoneInfo[]
 
 --- @class TrainIdIPC
 --- @field ref integer
@@ -39,6 +40,7 @@ local clusterio_api = require("modules/clusterio/api")
 --- @field name string?
 --- @field status InstanceStatus?
 --- @field stations string[]
+--- @field zones InstanceZoneInfo[]
 
 --- @alias AllZonesRCON {[ZoneName]: Zone}
 

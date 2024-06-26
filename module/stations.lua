@@ -92,11 +92,41 @@ local stations_global
 
 local instancedetails_ipc = ipc.register_json_ipc("clusterio_trains_instancedetails", "InstanceDetailsIPC")
 
+local function set_insert(table, value)
+    for _, entry in ipairs(table) do
+        if entry == value then return end
+    end
+    table[#table+1] = value
+end
+
 local function export_stations()
     local name_index = {}
+    --- @type {string: InstanceZoneInfo}
+    local zone_index = {}
     for unit_number, entity in pairs(stations_global.all_stations) do
         if entity.valid then
             name_index[entity.backer_name] = true
+            local registration = stations_global.stations[unit_number]
+            if registration ~= nil then
+                local zone = zone_index[registration.zone]
+                if zone == nil then
+                    local zone_obj = zones_api.lookup_zone(registration.zone)
+                    local link = zone_obj and zone_obj.link
+                    zone = {
+                        name = registration.zone,
+                        egress = {},
+                        ingress = {},
+                        target = link and {zone = link.zoneName, instance = link.instanceId}
+                    }
+                    zone_index[registration.zone] = zone
+                end
+                if registration.ingress then
+                    set_insert(zone.ingress, entity.backer_name)
+                end
+                if registration.egress then
+                    set_insert(zone.egress, entity.backer_name)
+                end
+            end
         else
             stations_global.all_stations[unit_number] = nil
         end
@@ -105,8 +135,15 @@ local function export_stations()
     for name, _ in pairs(name_index) do
         names[#names+1] = name
     end
+    local zones = {}
+    for _, zone in pairs(zone_index) do
+        if #zone.egress == 0 then zone.egress = nil end
+        if #zone.ingress == 0 then zone.ingress = nil end
+        zones[#zones+1] = zone
+    end
     instancedetails_ipc({
-        stations = names
+        stations = names,
+        zones = zones
     })
 end
 

@@ -38,7 +38,8 @@ export class ControllerPlugin extends BaseControllerPlugin {
 		this.controller.instances.forEach((val, id) => {
 			this.instanceDB.set(id, new InstanceDetails(id,
 				val.config.get("instance.name"), reducedStatus(val.status),
-				[] // TODO restore from database
+				[], // TODO restore from database
+				[]
 			))
 		})
 	}
